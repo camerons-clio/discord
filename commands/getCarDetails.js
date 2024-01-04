@@ -8,7 +8,7 @@ const {
 const commandFailedEmbed = require('../assets/Discord/commandFailedEmbed');
 
 // The DVLA Returns the color as a work like "BLUE" or "RED" so we need to convert it to a hex code for the embed
-let carColors = { "BEIGE": "#F5F5DC", "BLACK": "#000000", "BLUE": "#0000FF", "BRONZE": "#CD7F32", "BROWN": "#A52A2A", "BUFF": "#F0DC82", "CREAM": "#FFFDD0", "GOLD": "#FFD700", "GREEN": "#008000", "GREY": "#808080", "IVORY": "#FFFFF0", "MAROON": "#800000", "ORANGE": "#FFA500", "PINK": "#FFC0CB", "PURPLE": "#800080", "RED": "#FF0000", "SILVER": "#C0C0C0", "TURQUOISE": "#40E0D0", "WHITE": "#FFFFFF", "YELLOW": "#FFFF00" };
+let carColors = { "BEIGE": "#F5F5DC", "BLACK": "#000000", "BLUE": "DarkBlue", "BRONZE": "#CD7F32", "BROWN": "#A52A2A", "BUFF": "#F0DC82", "CREAM": "#FFFDD0", "GOLD": "#FFD700", "GREEN": "#008000", "GREY": "#808080", "IVORY": "#FFFFF0", "MAROON": "#800000", "ORANGE": "#FFA500", "PINK": "#FFC0CB", "PURPLE": "#800080", "RED": "#FF0000", "SILVER": "#C0C0C0", "TURQUOISE": "#40E0D0", "WHITE": "#FFFFFF", "YELLOW": "#FFFF00" };
 let registerMonthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", 'November', "December"];
 
 // Docs: https://developer-portal.driver-vehicle-licensing.api.gov.uk/apis/vehicle-enquiry-service/v1.2.0-vehicle-enquiry-service.html#schemas-properties-3
@@ -201,7 +201,7 @@ module.exports = {
                         let motTestEmbeds = [];
                         if (!motData['motTests']) {
                             // Not tests yet done on the car? Car may be new
-                            baseMotEmbed.setDescription(`Not MOT Tests Found... First Test Due ${motFirstDate['relativeTime']} (${motFirstDate['date']}${motFirstDate['ordinal']} ${motFirstDate['monthName']}${motFirstDate['year'] !== dateTime(new Date())['year'] ? ` ${motFirstDate['year']}` : ''})`);
+                            baseMotEmbed.setDescription(`Not MOT Tests Found... First Test Due ${motFirstDate['relativeTime'].replace("in", "within")} (${motFirstDate['date']}${motFirstDate['ordinal']} ${motFirstDate['monthName']}${motFirstDate['year'] !== dateTime(new Date())['year'] ? ` ${motFirstDate['year']}` : ''})`);
                         } else {
                             baseMotEmbed.setDescription(`${motData['motTests'].length} MOT Test${motData['motTests'].length > 1 ? "s" : ""} Found... First Test Date ${motFirstDate['date']}${motFirstDate['ordinal']} ${motFirstDate['monthName']}${motFirstDate['year'] !== dateTime(new Date())['year'] ? ` ${motFirstDate['year']}` : ''}`);
 
@@ -291,12 +291,48 @@ module.exports = {
                 totalEmbedSize++;
             }
             if (currentEmbedChunk.length > 0) embedsChunks.push(currentEmbedChunk);
+
+            // check we arent currently in a thread
+            if (!interaction.channel.isThread()) {
+                // if a thread already exists we can just send the embeds to it to keep them all in one place
+                var thread = undefined;
+                for (let serverChannel of interaction.guild.channels.cache) {
+                    if (serverChannel[1]['type'] !== 11) continue;
+                    if (serverChannel[1]['name'] !== `${reg}`) continue;
+                    thread = serverChannel[1];
+                }
+                if (!thread) {
+                    thread = await interaction.channel.threads.create({
+                        name: `${reg}`,
+                        autoArchiveDuration: 1440,
+                        reason: `MOT History for ${reg}`
+                    });
+                }
+            }
+
+            // send chunks
             for (let eachEmbedChunk of embedsChunks) {
-                await interaction.followUp({
-                    embeds: eachEmbedChunk
-                });
+                if (!interaction.channel.isThread()) {
+                    await thread.send({
+                        embeds: eachEmbedChunk
+                    });
+                } else {
+                    await interaction.followUp({
+                        embeds: eachEmbedChunk,
+                        thread: thread
+                    });
+                }
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
+
+            // send final message
+            let finalThreadNotifyEmbed = new EmbedBuilder()
+                .setTitle(`MOT History for ${reg}`)
+                .setDescription(`MOT History for ${reg} has been sent to ${thread}`)
+                .setColor("#FFB347");
+            await interaction.editReply({
+                embeds: [finalThreadNotifyEmbed]
+            });
         } catch (err) {
             await commandFailedEmbed(interaction, err);
         }
