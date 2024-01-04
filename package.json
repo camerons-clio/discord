@@ -1,0 +1,27 @@
+{
+  "name": "camerons-clio",
+  "version": "1.0.0",
+  "description": "Access the MOT and VES data through Discord",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joshua-Noakes1/camerons-clio.git"
+  },
+  "author": "Joshua-Noakes1",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/Joshua-Noakes1/camerons-clio/issues"
+  },
+  "homepage": "https://github.com/Joshua-Noakes1/camerons-clio#readme",
+  "dependencies": {
+    "@discordjs/rest": "^2.2.0",
+    "cli-color": "^2.0.3",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1",
+    "node-fetch": "^2.7.0",
+    "path": "^0.12.7"
+  }
+}

@@ -1,8 +1,3 @@
-# DiscordJS-Template
+# camerons-clio
 
-## Dependencies
-
-```shell
-    npm init
-    npm i --save cli-color dotenv discord.js @discordjs/rest path
-```
+Access the DVLA's MOT and VES data through Discord
