@@ -1,7 +1,7 @@
 const lcl = require('cli-color');
 const { EmbedBuilder } = require('discord.js');
 const { InteractionResponseType, InteractionResponseFlags, InteractionType } = require('discord-interactions');
-const { verify } = require('discord-verify');
+const { verify } = require('discord-verify/node');
 const defaultFetchHeaders = require('../../utils/defaultFetchHeaders');
 const dateTime = require('../../utils/dateTime');
 
