@@ -3,11 +3,14 @@ import { default as lcl } from 'cli-color';
 import { InteractionResponseType, InteractionResponseFlags, InteractionType } from 'discord-interactions';
 import { verify } from 'discord-verify';
 import crypto from 'node:crypto';
+import authMiddleware from '../../assets/express/authMiddleware';
+
 import { GET_CAR_COMMAND } from '../../assets/discord/commands';
 
 import express from 'express';
 const router = express.Router();
 
+// Handle Discord Interactions
 router.post('/', async function (req, res) {
     try {
         if (req.headers['content-type'] !== 'application/json') {
@@ -49,10 +52,19 @@ router.post('/', async function (req, res) {
         if (requestBody.type === InteractionType.APPLICATION_COMMAND) {
             switch(requestBody.data.name.toLowerCase()) { // They should already be lowercase...
                 case GET_CAR_COMMAND.name.toLowerCase():
-                        // Do stuff with the reg here...
+                        // get the reg from the request
+                        const reg = requestBody.data.options[0].value;
+                        console.log(reg);
+
+                        return res.status(200).json({
+                            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                            data: {
+                                content: `You requested ${reg}`
+                            }
+                        });
                     break;
                 default:
-                    console.log(`${lcl.red(['Discord Interaction - Error'])} ${lcl.yellow('Invalid Command')}`);
+                    console.log(`${lcl.red('[Discord Interaction - Error]')} Invalid Command`);
                     return res.status(400).json({
                         status: false,
                         message: 'Invalid Command'
@@ -60,12 +72,20 @@ router.post('/', async function (req, res) {
             }
         }
     } catch (err: any) {
-        console.log(`${lcl.red(['Discord Interaction - Error'])} ${lcl.yellow(err)}`);
+        console.log(`${lcl.red('[Discord Interaction - Error]')} ${err['message']}`);
         return res.status(err['statusCode'] || 500).json({
             status: false,
             message: err.message
         });
     }
+});
+
+// Register Commands
+router.get('/register', authMiddleware, async function (req, res) {
+    return res.status(200).json({
+        status: true,
+        message: 'Registering Commands'
+    });
 });
 
 export default router;
