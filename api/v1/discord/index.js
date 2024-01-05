@@ -43,6 +43,25 @@ export default async function handler(req, res) {
                 type: InteractionResponseType.PONG
             });
         }
+
+        if (req.body.type === InteractionType.APPLICATION_COMMAND) {
+            switch (req.body.data.name?.toString().toLowerCase()) {
+                default:
+                    console.log(`${lcl.yellowBright('[Discord - Warn]')} Unknown command: "${req.body.data.name}"`);
+                    let errorEmbed = new EmbedBuilder()
+                        .setTitle('Unknown command')
+                        .setDescription(`The command "${req.body.data.name}" is unknown. Please try again.`)
+                        .setColor('#FF6961')
+                        .setTimestamp();
+                    return res.status(200).json({
+                        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                        data: {
+                            embeds: [errorEmbed.toJSON()],
+                            flags: InteractionResponseFlags.EPHEMERAL
+                        }
+                    });
+            }
+        }
     } catch (err) {
         console.error(`${lcl.redBright('[Vercel - Error]')} ${lcl.yellow(err['statusCode'] || 500)} - ${err['message']}`);
         return res.status(err['statusCode'] || 500).json({
