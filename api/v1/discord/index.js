@@ -1,7 +1,7 @@
 const lcl = require('cli-color');
 const { EmbedBuilder } = require('discord.js');
-const { InteractionResponseType, InteractionResponseFlags, InteractionType } = require('discord-interactions');
-const { verify } = require('discord-verify/node');
+const { InteractionResponseType, InteractionResponseFlags, InteractionType, verifyKey } = require('discord-interactions');
+// const { verify } = require('discord-verify/node');
 const defaultFetchHeaders = require('../../utils/defaultFetchHeaders');
 const dateTime = require('../../utils/dateTime');
 
@@ -27,12 +27,12 @@ export default async function handler(req, res) {
             error['statusCode'] = 401;
             throw error;
         }
-        const isVerified = await verify(
+        const isVerified = await verifyKey(
             JSON.stringify(requestBody),
             requestSignature,
             requestTimestamp,
             process.env.DCORD_PUBLIC_KEY,
-            crypto.subtle
+            // crypto.subtle
         );
         if (!isVerified) {
             let error = new Error('Unauthorized');
