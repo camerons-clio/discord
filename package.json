@@ -21,13 +21,14 @@
     "url": "https://github.com/Joshua-Noakes1/camerons-clio/issues"
   },
   "homepage": "https://github.com/Joshua-Noakes1/camerons-clio#readme",
-  "devDependencies": {
-    "@vercel/node": "^3.0.15"
-  },
   "dependencies": {
+    "@vercel/edge": "^1.1.1",
     "cli-color": "^2.0.3",
     "discord-interactions": "^3.4.0",
     "discord-verify": "^1.2.0",
     "discord.js": "^14.11.0"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.0.15"
   }
 }

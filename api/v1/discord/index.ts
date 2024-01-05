@@ -39,6 +39,21 @@ export default async (req: VercelRequest, res: VercelResponse) => {
                 type: InteractionResponseType.PONG
             });
         }
+
+        // commands from discord
+        if (requestBody.type === InteractionType.APPLICATION_COMMAND) {
+            switch (requestBody.data.name.toLowerCase()) {
+                default:
+                    console.log(`${lcl.yellowBright('[Discord Interaction - Warn]')} Unknown command!`);
+                    return res.status(200).json({
+                        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                        data: {
+                            content: "Unknown command!",
+                            flags: InteractionResponseFlags.EPHEMERAL
+                        }
+                    });
+            }
+        }
     } catch (err: any) {
         console.log(`${lcl.redBright('[Vercel - Error]')} ${err['message']}`);
         return res.status(err['statusCode'] || 500).json({
