@@ -57,6 +57,19 @@ app.use((err, req, res, next) => {
 
 // start server
 const server = app.listen(Number(process.env.PORT || 3000), () => {
-    let { port } = server.address() as AddressInfo;
-    console.log(lcl.green("[Express - Info]"), "Started server on port", lcl.cyan(port));
+    let { address, port } = server.address() as AddressInfo;
+    console.log(lcl.green("[Express - Info]"), "Started server on", lcl.cyan(port));
+    
+    // on boot we want to register the commands with discord
+    if (process.env.NODE_ENV !== 'production') return;
+    try {
+        // going to assume we are at least running on localhost (eg docker)
+        fetch(`http://localhost:${port}/api/v1/discord/register`, {
+            headers: {
+                "Authorization": `Basic ${process.env.HTTP_AUTH}`
+            }
+        });
+    } catch(err: any) {
+        console.log(`${lcl.red('[Discord - Error]')} ${err['message']}`)
+    }
 });
