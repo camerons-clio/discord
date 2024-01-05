@@ -50,18 +50,18 @@ router.post('/', async function (req, res) {
 
         // Do command stuff here
         if (requestBody.type === InteractionType.APPLICATION_COMMAND) {
-            switch(requestBody.data.name.toLowerCase()) { // They should already be lowercase...
+            switch (requestBody.data.name.toLowerCase()) { // They should already be lowercase...
                 case GET_CAR_COMMAND.name.toLowerCase():
-                        // get the reg from the request
-                        const reg = requestBody.data.options[0].value;
-                        console.log(reg);
+                    // get the reg from the request
+                    const reg = requestBody.data.options[0].value;
+                    console.log(reg);
 
-                        return res.status(200).json({
-                            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                            data: {
-                                content: `You requested ${reg}`
-                            }
-                        });
+                    return res.status(200).json({
+                        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                        data: {
+                            content: `You requested ${reg}`
+                        }
+                    });
                     break;
                 default:
                     console.log(`${lcl.red('[Discord Interaction - Error]')} Invalid Command`);
@@ -82,10 +82,37 @@ router.post('/', async function (req, res) {
 
 // Register Commands
 router.get('/register', authMiddleware, async function (req, res) {
-    return res.status(200).json({
-        status: true,
-        message: 'Registering Commands'
-    });
+    try {
+        if (!process.env.APP_ID) throw new Error('No app id found');
+
+        // register commands with discord
+        let commandsArray = [GET_CAR_COMMAND];
+        let registedCommands = await fetch(`https://discord.com/api/v10/applications/${process.env.APP_ID}/commands`, {
+            method: 'PUT',
+            headers: {
+                "Content-Type": 'application/json',
+                "Authorization": `Bot ${process.env.TOKEN}`,
+                "User-Agent": `Node/${process.version} Github/Joshua-Noakes1/camerons-clio`
+            },
+            body: JSON.stringify(commandsArray)
+        });
+        if (registedCommands.status !== 200) {
+            let error = new Error('Failed to register commands');
+            error['statusCode'] = registedCommands.status || 500;
+            throw error;
+        }
+
+        return res.status(200).json({
+            status: true,
+            message: `Successfully registered ${commandsArray.length} command${commandsArray.length > 1 ? 's' : ''}`
+        });
+    } catch (err: any) {
+        console.log(`${lcl.red('[Discord - Error]')} ${err['message']}`)
+        return res.status(err['statusCode'] || 500).json({
+            status: false,
+            message: err.message
+        });
+    }
 });
 
 export default router;
