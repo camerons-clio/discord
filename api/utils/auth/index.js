@@ -1,7 +1,7 @@
 const lcl = require('cli-color');
 
 // checks a user's auth header against the env token
-export default function(header) {
+function auth(header) {
     try {
         if (!header) throw new Error('No auth header provided');
         const [authType, authToken] = header.split(' ');
@@ -15,3 +15,5 @@ export default function(header) {
         return false;
     }
 }
+
+module.exports = auth;

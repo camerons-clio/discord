@@ -1,4 +1,8 @@
-const checkAuth = require('../../utils/auth/index.js');
+const lcl = require('cli-color');
+const checkAuth = require('../../utils/auth');
+const defaultFetchHeaders = require('../../utils/defaultFetchHeaders');
+
+const { GET_CAR_COMMAND } = require('../../utils/discordCommands');
 
 export default async function handler(req, res) {
     try {
@@ -7,10 +11,26 @@ export default async function handler(req, res) {
             error['statusCode'] = 401;
             throw error;
         }
+        // register commands with discord
+        let commandsArray = [GET_CAR_COMMAND];
+        let registedCommands = await fetch(`https://discord.com/api/v10/applications/${process.env.DCORD_APP_ID}/commands`, {
+            method: 'PUT',
+            headers: {
+                ...defaultFetchHeaders(),
+                "Content-Type": 'application/json',
+                "Authorization": `Bot ${process.env.DCORD_TOKEN}`
+            },
+            body: JSON.stringify(commandsArray)
+        });
+        if (registedCommands.status !== 200) {
+            let error = new Error('Failed to register commands');
+            error['statusCode'] = registedCommands.status || 500;
+            throw error;
+        }
 
         return res.status(200).json({
-            success: true,
-            message: 'Successfully pinged Discord!'
+            status: true,
+            message: `Successfully registered ${commandsArray.length} command${commandsArray.length > 1 ? 's' : ''}`
         });
     } catch (err) {
         console.error(`${lcl.redBright('[Vercel - Error]')} ${lcl.yellow(err['statusCode'] || 500)} - ${err['message']}`);
