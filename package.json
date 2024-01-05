@@ -1,10 +1,15 @@
 {
   "name": "camerons-clio",
   "version": "1.0.0",
-  "description": "Access the MOT and VES data through Discord",
+  "description": "Access the DVLA's MOT and VES data through Discord",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "install-deps": "npm i --save cli-color dotenv express compression morgan path serve-favicon body-parser cors portfinder && npm i -D typescript ts-node-dev nodemon copyfiles rimraf @types/node @types/cli-color @types/express",
+    "copy-files": "copyfiles -u 1 src/public/* dist",
+    "clean": "rimraf dist",
+    "start": "node dist/app.js",
+    "dev": "nodemon -q src/app.ts",
+    "build": "npm run clean && tsc && npm run copy-files"
   },
   "repository": {
     "type": "git",
@@ -17,11 +22,24 @@
   },
   "homepage": "https://github.com/Joshua-Noakes1/camerons-clio#readme",
   "dependencies": {
-    "@discordjs/rest": "^2.2.0",
+    "body-parser": "^1.20.2",
     "cli-color": "^2.0.3",
-    "discord.js": "^14.14.1",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "node-fetch": "^2.7.0",
-    "path": "^0.12.7"
+    "express": "^4.18.2",
+    "morgan": "^1.10.0",
+    "path": "^0.12.7",
+    "serve-favicon": "^2.5.0"
+  },
+  "devDependencies": {
+    "@types/cli-color": "^2.0.6",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.6",
+    "copyfiles": "^2.4.1",
+    "nodemon": "^3.0.2",
+    "rimraf": "^5.0.5",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
   }
 }
