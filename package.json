@@ -7,7 +7,7 @@
     "install-deps": "npm i --save cli-color dotenv express compression morgan path serve-favicon body-parser cors portfinder && npm i -D typescript ts-node-dev nodemon copyfiles rimraf @types/node @types/cli-color @types/express",
     "copy-files": "copyfiles -u 1 src/public/* dist",
     "clean": "rimraf dist",
-    "start": "node dist/app.js",
+    "start": "node app.js",
     "dev": "nodemon -q src/app.ts",
     "build": "npm run clean && tsc && npm run copy-files"
   },
