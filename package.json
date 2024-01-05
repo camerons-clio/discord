@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Access the DVLA's MOT and VES data through Discord",
   "main": "index.js",
+  "private": true,
+  "engines": {
+    "node": ">=20.x"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
