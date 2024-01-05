@@ -3,6 +3,7 @@ import { default as lcl } from 'cli-color';
 import { InteractionResponseType, InteractionResponseFlags, InteractionType } from 'discord-interactions';
 import { verify } from 'discord-verify';
 import crypto from 'node:crypto';
+import { GET_CAR_COMMAND } from '../../assets/discord/commands';
 
 import express from 'express';
 const router = express.Router();
@@ -45,6 +46,19 @@ router.post('/', async function (req, res) {
         }
 
         // Do command stuff here
+        if (requestBody.type === InteractionType.APPLICATION_COMMAND) {
+            switch(requestBody.data.name.toLowerCase()) { // They should already be lowercase...
+                case GET_CAR_COMMAND.name.toLowerCase():
+                        // Do stuff with the reg here...
+                    break;
+                default:
+                    console.log(`${lcl.red(['Discord Interaction - Error'])} ${lcl.yellow('Invalid Command')}`);
+                    return res.status(400).json({
+                        status: false,
+                        message: 'Invalid Command'
+                    });
+            }
+        }
     } catch (err: any) {
         console.log(`${lcl.red(['Discord Interaction - Error'])} ${lcl.yellow(err)}`);
         return res.status(err['statusCode'] || 500).json({
