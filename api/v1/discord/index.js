@@ -85,7 +85,7 @@ export default async function handler(req, res) {
                         // let motData = await motDataRaw.json();
 
                         // make ves data embed
-                        let embedsToSend = [];
+                        let createdEmbeds = [];
                         if (vesDataRaw.status === 200) {
                             try {
                                 // the ves api returns all words as uppercase
@@ -174,17 +174,72 @@ export default async function handler(req, res) {
                                 vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
 
 
-                                embedsToSend.push(vesEmbed);
+                                createdEmbeds.push(vesEmbed);
                             } catch (err) {
                                 console.log(`${lcl.red('[VES API - Error]')} ${err['message']}`);
                             }
                         }
 
-                        if (embedsToSend.length <= 0) throw new Error(`No car found with registration "${carRegNumber}"`);
+                        if (createdEmbeds.length <= 0) throw new Error(`No car found with registration "${carRegNumber}"`);
+
+                        // if the embeds are over 10 we need to split them into multiple messages
+                        let embedsToSend = [];
+                        let currentEmbedToSendChunk = [];
+                        for (let eachCreatedEmbed of createdEmbeds) {
+                            if (currentEmbedToSendChunk.length >= 10) {
+                                embedsToSend.push(currentEmbedToSendChunk);
+                                currentEmbedToSendChunk = [];
+                            }
+                            currentEmbedToSendChunk.push(eachCreatedEmbed);
+                        }
+                        if (currentEmbedToSendChunk.length > 0) embedsToSend.push(currentEmbedToSendChunk);
+
+                        // make thread to send all embeds in (after a car has a lot of mots theres a lot of embeds)
+                        let embedsThread = await fetch(`https://discord.com/api/v10/channels/${req.body.channel_id}/threads`, {
+                            method: 'POST',
+                            headers: {
+                                ...defaultFetchHeaders(),
+                                "Content-Type": 'application/json',
+                                "Authorization": `Bot ${process.env.DCORD_TOKEN}`,
+                                "X-Audit-Log-Reason": `Making thread for ${carRegNumber} for ${req.body.member.user.username}`
+                            },
+                            body: JSON.stringify({
+                                name: `${carRegNumber}`,
+                                auto_archive_duration: 1440,
+                                type: 11,
+                            })
+                        });
+                        if (embedsThread.status !== 201) throw new Error('Failed to create thread');
+                        let embedsThreadData = await embedsThread.json();
+
+                        // send embeds to thread
+                        for (let embed of embedsToSend) {
+                            let embedsThreadMessage = await fetch(`https://discord.com/api/v10/channels/${embedsThreadData['id']}/messages`, {
+                                method: 'POST',
+                                headers: {
+                                    ...defaultFetchHeaders(),
+                                    "Content-Type": 'application/json',
+                                    "Authorization": `Bot ${process.env.DCORD_TOKEN}`,
+                                    "X-Audit-Log-Reason": `Sending embeds for ${carRegNumber} for ${req.body.member.user.username}`
+                                },
+                                body: JSON.stringify({
+                                    embeds: [...embed]
+                                })
+                            });
+                            if (embedsThreadMessage.status !== 200) throw new Error('Failed to send embeds');
+                        }
+
+                        // send final embed to user
+                        let finalThreadNotifyEmbed = new EmbedBuilder()
+                            .setTitle(`MOT History for ${carRegNumber}`)
+                            .setDescription(`MOT History for ${carRegNumber} has been sent to <#${embedsThreadData['id']}>`)
+                            .setColor("#FFB347")
+                            .setTimestamp();
                         return res.status(200).json({
                             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                             data: {
-                                embeds: [...embedsToSend]
+                                embeds: [finalThreadNotifyEmbed],
+                                flags: InteractionResponseFlags.EPHEMERAL
                             }
                         });
                     } catch (err) {
