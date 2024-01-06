@@ -55,15 +55,25 @@ export default async function handler(req, res) {
                 case GET_CAR_COMMAND['name'].toString().toLowerCase():
                     try {
                         // defer the response
-                        await fetch(`https://discord.com/api/v10/interactions/${requestBody.id}/${requestBody.token}/callback`, {
+                        let deferResponse = await fetch(`https://discord.com/api/v10/interactions/${requestBody.id}/${requestBody.token}/callback`, {
                             method: 'POST',
                             headers: {
                                 ...defaultFetchHeaders(),
-                            }
+                                "Content-Type": 'application/json',
+                            },
+                            body: JSON.stringify({
+                                type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+                                data: {
+                                    flags: InteractionResponseFlags.EPHEMERAL
+                                }
+                            })
                         });
+                        console.log(JSON.stringify(await deferResponse.json()));
 
                         // get the reg from the request
                         const carRegNumber = requestBody.data.options[0].value?.toString().toUpperCase().replace(/\s/g, '').trim();
+
+                        console.log(`${lcl.blueBright('[Discord - Info]')} Getting data for car "${carRegNumber}"`);
 
                         // get the data from VES and MOT APIs
                         let vesDataRaw = await fetch(`https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles`, {
@@ -77,24 +87,26 @@ export default async function handler(req, res) {
                                 registrationNumber: carRegNumber
                             })
                         });
-                        if (vesDataRaw.status === 401) throw new Error('Invalid API Key');
-                        if (vesDataRaw.status >= 500) throw new Error('VES Service Error');
+                        if (vesDataRaw.status === 401) console.log(`${lcl.yellowBright('[VES API - Warn]')} Invalid VES API Key`);
+                        if (vesDataRaw.status >= 500) console.log(`${lcl.yellowBright('[VES API - Warn]')} VES Service Error`);
                         let vesData = await vesDataRaw.json();
 
                         // get MOT
-                        // let motDataRaw = await fetch(`https://beta.check-mot.service.gov.uk/trade/vehicles/mot-tests?registration=${carRegNumber}`, {
-                        //     headers: {
-                        //         ...defaultFetchHeaders(),
-                        //         "Content-Type": 'application/json',
-                        //         "x-api-key": process.env.GOV_MOT_KEY,
-                        //     }
-                        // });
-                        // if (motDataRaw.status >= 500) throw new Error('MOT Service Error');
-                        // let motData = await motDataRaw.json();
+                        let motDataRaw = await fetch(`https://beta.check-mot.service.gov.uk/trade/vehicles/mot-tests?registration=${carRegNumber}`, {
+                            headers: {
+                                ...defaultFetchHeaders(),
+                                "Content-Type": 'application/json',
+                                "x-api-key": process.env.GOV_MOT_KEY,
+                            }
+                        });
+                        if (motDataRaw.status === 401) console.log(`${lcl.yellowBright('[MOT API - Warn]')} Invalid MOT API Key`);
+                        if (motDataRaw.status >= 500) console.log(`${lcl.yellowBright('[MOT API - Warn]')} MOT Service Error`);
+                        let motData = await motDataRaw.json();
 
                         // make ves data embed
                         let createdEmbeds = [];
                         if (vesDataRaw.status === 200) {
+                            console.log(`${lcl.greenBright('[VES API - Success]')} Got data for car "${carRegNumber}"`);
                             try {
                                 // the ves api returns all words as uppercase
                                 let carMake = vesData['make'].charAt(0).toUpperCase() + vesData['make'].slice(1).toLowerCase();
@@ -183,6 +195,7 @@ export default async function handler(req, res) {
 
 
                                 createdEmbeds.push(vesEmbed);
+                                console.log(`${lcl.greenBright('[VES API - Success]')} Created embed for car "${carRegNumber}"`);
                             } catch (err) {
                                 console.log(`${lcl.red('[VES API - Error]')} ${err['message']}`);
                             }
@@ -190,147 +203,147 @@ export default async function handler(req, res) {
 
                         if (createdEmbeds.length <= 0) throw new Error(`No car found with registration "${carRegNumber}"`);
 
-                        // if the embeds are over 10 we need to split them into multiple messages
-                        let embedsToSend = [];
-                        let currentEmbedToSendChunk = [];
-                        for (let eachCreatedEmbed of createdEmbeds) {
-                            if (currentEmbedToSendChunk.length >= 10) {
-                                embedsToSend.push(currentEmbedToSendChunk);
-                                currentEmbedToSendChunk = [];
-                            }
-                            currentEmbedToSendChunk.push(eachCreatedEmbed);
-                        }
-                        if (currentEmbedToSendChunk.length > 0) embedsToSend.push(currentEmbedToSendChunk);
+                        // // if the embeds are over 10 we need to split them into multiple messages
+                        // let embedsToSend = [];
+                        // let currentEmbedToSendChunk = [];
+                        // for (let eachCreatedEmbed of createdEmbeds) {
+                        //     if (currentEmbedToSendChunk.length >= 10) {
+                        //         embedsToSend.push(currentEmbedToSendChunk);
+                        //         currentEmbedToSendChunk = [];
+                        //     }
+                        //     currentEmbedToSendChunk.push(eachCreatedEmbed);
+                        // }
+                        // if (currentEmbedToSendChunk.length > 0) embedsToSend.push(currentEmbedToSendChunk);
 
-                        // send embeds to user in a new thread
-                        let embedsThread = undefined;
-                        // find potential threads with the same name
-                        try {
-                            let activeGuildThreads = await fetch(`https://discord.com/api/v10/guilds/${requestBody.channel.guild_id}/threads/active`, {
-                                method: 'GET',
-                                headers: {
-                                    ...defaultFetchHeaders(),
-                                    "Authorization": `Bot ${process.env.DCORD_TOKEN}`,
-                                }
-                            });
-                            if (activeGuildThreads.status !== 200) {
-                                console.log(`${lcl.yellowBright('[Discord - Warn]')} Failed to get active threads for guild ${requestBody.channel.guild_id}`)
-                            } else {
-                                let activeGuildThreadsData = await activeGuildThreads.json();
+                        // // send embeds to user in a new thread
+                        // let embedsThread = undefined;
+                        // // find potential threads with the same name
+                        // try {
+                        //     let activeGuildThreads = await fetch(`https://discord.com/api/v10/guilds/${requestBody.channel.guild_id}/threads/active`, {
+                        //         method: 'GET',
+                        //         headers: {
+                        //             ...defaultFetchHeaders(),
+                        //             "Authorization": `Bot ${process.env.DCORD_TOKEN}`,
+                        //         }
+                        //     });
+                        //     if (activeGuildThreads.status !== 200) {
+                        //         console.log(`${lcl.yellowBright('[Discord - Warn]')} Failed to get active threads for guild ${requestBody.channel.guild_id}`)
+                        //     } else {
+                        //         let activeGuildThreadsData = await activeGuildThreads.json();
 
-                                // find all threads with the same name as the reg and sort to find the newest
-                                let foundThreads = [];
-                                for (let eachThread of activeGuildThreadsData['threads']) {
-                                    if (eachThread.name === carRegNumber) {
-                                        foundThreads.push(eachThread);
-                                    }
-                                }
-                                foundThreads.sort((a, b) => {
-                                    return new Date(b['thread_metadata']['created_timestamp']) - new Date(a['thread_metadata']['created_timestamp']);
-                                });
-                                embedsThread = foundThreads[0];
-                            }
-                        } catch (err) {
-                            console.log(`${lcl.red('[Discord Guild Threads - Error]')} ${err['message']}`);
-                        }
+                        //         // find all threads with the same name as the reg and sort to find the newest
+                        //         let foundThreads = [];
+                        //         for (let eachThread of activeGuildThreadsData['threads']) {
+                        //             if (eachThread.name === carRegNumber) {
+                        //                 foundThreads.push(eachThread);
+                        //             }
+                        //         }
+                        //         foundThreads.sort((a, b) => {
+                        //             return new Date(b['thread_metadata']['created_timestamp']) - new Date(a['thread_metadata']['created_timestamp']);
+                        //         });
+                        //         embedsThread = foundThreads[0];
+                        //     }
+                        // } catch (err) {
+                        //     console.log(`${lcl.red('[Discord Guild Threads - Error]')} ${err['message']}`);
+                        // }
 
-                        // if a thread doesnt exist create one
-                        if (embedsThread === undefined) {
-                            let newEmbedThread = await fetch(`https://discord.com/api/v10/channels/${requestBody.channel_id}/threads`, {
-                                method: 'POST',
-                                headers: {
-                                    ...defaultFetchHeaders(),
-                                    "Content-Type": 'application/json',
-                                    "Authorization": `Bot ${process.env.DCORD_TOKEN}`,
-                                    "X-Audit-Log-Reason": `Making thread for ${carRegNumber} for ${requestBody.member.user.username}`
-                                },
-                                body: JSON.stringify({
-                                    name: `${carRegNumber}`,
-                                    auto_archive_duration: 1440,
-                                    type: 11,
-                                })
-                            });
-                            if (newEmbedThread.status !== 201) throw new Error('Failed to create thread');
-                            embedsThread = await newEmbedThread.json();
+                        // // if a thread doesnt exist create one
+                        // if (embedsThread === undefined) {
+                        //     let newEmbedThread = await fetch(`https://discord.com/api/v10/channels/${requestBody.channel_id}/threads`, {
+                        //         method: 'POST',
+                        //         headers: {
+                        //             ...defaultFetchHeaders(),
+                        //             "Content-Type": 'application/json',
+                        //             "Authorization": `Bot ${process.env.DCORD_TOKEN}`,
+                        //             "X-Audit-Log-Reason": `Making thread for ${carRegNumber} for ${requestBody.member.user.username}`
+                        //         },
+                        //         body: JSON.stringify({
+                        //             name: `${carRegNumber}`,
+                        //             auto_archive_duration: 1440,
+                        //             type: 11,
+                        //         })
+                        //     });
+                        //     if (newEmbedThread.status !== 201) throw new Error('Failed to create thread');
+                        //     embedsThread = await newEmbedThread.json();
 
-                            // we need to wait a few seconds for the thread to be created or the app silently fails
-                            await new Promise(resolve => setTimeout(resolve, 5000));
+                        //     // we need to wait a few seconds for the thread to be created or the app silently fails
+                        //     await new Promise(resolve => setTimeout(resolve, 5000));
 
-                            // check if the thread was created
-                            let checkThread = await fetch(`https://discord.com/api/v10/channels/${embedsThread['id']}`, {
-                                method: 'GET',
-                                headers: {
-                                    ...defaultFetchHeaders(),
-                                    "Authorization": `Bot ${process.env.DCORD_TOKEN}`,
-                                }
-                            });
-                            if (checkThread.status !== 200) throw new Error('Failed to create thread');
-                        }
+                        //     // check if the thread was created
+                        //     let checkThread = await fetch(`https://discord.com/api/v10/channels/${embedsThread['id']}`, {
+                        //         method: 'GET',
+                        //         headers: {
+                        //             ...defaultFetchHeaders(),
+                        //             "Authorization": `Bot ${process.env.DCORD_TOKEN}`,
+                        //         }
+                        //     });
+                        //     if (checkThread.status !== 200) throw new Error('Failed to create thread');
+                        // }
 
-                        // send each embed to the thread
-                        console.log(`${lcl.blueBright('[Discord - Info]')} Sending embeds to thread "${embedsThread['id']}"`);
-                        for (let embedsIndex in embedsToSend) {
-                            console.log(`${lcl.blueBright('[Discord - Info]')} Sending embed ${Math.floor(embedsIndex) + 1} of ${embedsToSend.length}`);
-                            try {
-                                let embeds = embedsToSend[embedsIndex];
-                                let embedsThreadMessage = await fetch(`https://discord.com/api/v10/channels/${embedsThread['id']}/messages`, {
-                                    method: 'POST',
-                                    headers: {
-                                        ...defaultFetchHeaders(),
-                                        "Content-Type": 'application/json',
-                                        "Authorization": `Bot ${process.env.DCORD_TOKEN}`,
-                                    },
-                                    body: JSON.stringify({
-                                        embeds: [...embeds]
-                                    })
-                                });
-                                if (embedsThreadMessage.status !== 200) throw new Error('Failed to send embeds');
-                                console.log(`${lcl.greenBright('[Discord - Success]')} Sent embed ${Math.floor(embedsIndex) + 1} of ${embedsToSend.length}`);
-                            } catch (err) {
-
-                                console.log(`${lcl.redBright('[Discord - Error]')} Failed to send embed ${Math.floor(embedsIndex) + 1} of ${embedsToSend.length}`);
-                            }
-                        }
-                        // // send embeds to thread
-                        // console.log(`${lcl.blueBright('[Discord - Info]')} Sending embeds to thread ${embedsThread['id']}`);
+                        // // send each embed to the thread
+                        // console.log(`${lcl.blueBright('[Discord - Info]')} Sending embeds to thread "${embedsThread['id']}"`);
                         // for (let embedsIndex in embedsToSend) {
+                        //     console.log(`${lcl.blueBright('[Discord - Info]')} Sending embed ${Math.floor(embedsIndex) + 1} of ${embedsToSend.length}`);
                         //     try {
                         //         let embeds = embedsToSend[embedsIndex];
-                        //         console.log(`${lcl.blueBright('[Discord - Info]')} Sending embed ${Math.floor(embedsIndex + 1)} of ${embedsToSend.length}`);
                         //         let embedsThreadMessage = await fetch(`https://discord.com/api/v10/channels/${embedsThread['id']}/messages`, {
                         //             method: 'POST',
                         //             headers: {
                         //                 ...defaultFetchHeaders(),
                         //                 "Content-Type": 'application/json',
-                        //                 "Authorization": `Bot ${process.env.DCORD_TOKEN}`
+                        //                 "Authorization": `Bot ${process.env.DCORD_TOKEN}`,
                         //             },
                         //             body: JSON.stringify({
                         //                 embeds: [...embeds]
                         //             })
                         //         });
                         //         if (embedsThreadMessage.status !== 200) throw new Error('Failed to send embeds');
-                        //         console.log(`${lcl.greenBright('[Discord - Success]')} Sent embed ${Math.floor(embedsIndex + 1)} of ${embedsToSend.length}`);
+                        //         console.log(`${lcl.greenBright('[Discord - Success]')} Sent embed ${Math.floor(embedsIndex) + 1} of ${embedsToSend.length}`);
                         //     } catch (err) {
-                        //         console.log(`${lcl.red('[Discord - Error]')} ${err['message']}`);
+
+                        //         console.log(`${lcl.redBright('[Discord - Error]')} Failed to send embed ${Math.floor(embedsIndex) + 1} of ${embedsToSend.length}`);
                         //     }
                         // }
-                        // console.log(`${lcl.greenBright('[Discord - Success]')} Sent all embeds to thread ${embedsThread['id']}`);
+                        // // // send embeds to thread
+                        // // console.log(`${lcl.blueBright('[Discord - Info]')} Sending embeds to thread ${embedsThread['id']}`);
+                        // // for (let embedsIndex in embedsToSend) {
+                        // //     try {
+                        // //         let embeds = embedsToSend[embedsIndex];
+                        // //         console.log(`${lcl.blueBright('[Discord - Info]')} Sending embed ${Math.floor(embedsIndex + 1)} of ${embedsToSend.length}`);
+                        // //         let embedsThreadMessage = await fetch(`https://discord.com/api/v10/channels/${embedsThread['id']}/messages`, {
+                        // //             method: 'POST',
+                        // //             headers: {
+                        // //                 ...defaultFetchHeaders(),
+                        // //                 "Content-Type": 'application/json',
+                        // //                 "Authorization": `Bot ${process.env.DCORD_TOKEN}`
+                        // //             },
+                        // //             body: JSON.stringify({
+                        // //                 embeds: [...embeds]
+                        // //             })
+                        // //         });
+                        // //         if (embedsThreadMessage.status !== 200) throw new Error('Failed to send embeds');
+                        // //         console.log(`${lcl.greenBright('[Discord - Success]')} Sent embed ${Math.floor(embedsIndex + 1)} of ${embedsToSend.length}`);
+                        // //     } catch (err) {
+                        // //         console.log(`${lcl.red('[Discord - Error]')} ${err['message']}`);
+                        // //     }
+                        // // }
+                        // // console.log(`${lcl.greenBright('[Discord - Success]')} Sent all embeds to thread ${embedsThread['id']}`);
 
-                        // // send final embed to user
-                        // let finalThreadNotifyEmbed = new EmbedBuilder()
-                        //     .setTitle(`MOT History for ${carRegNumber}`)
-                        //     .setDescription(`MOT History for ${carRegNumber} has been sent to <#${embedsThread['id']}>`)
-                        //     .setColor("#FFB347")
-                        //     .setTimestamp();
-                        // return res.status(200).json({
-                        //     type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                        //     data: {
-                        //         embeds: [finalThreadNotifyEmbed],
-                        //         flags: InteractionResponseFlags.EPHEMERAL
-                        //     }
-                        // });
+                        // // // send final embed to user
+                        // // let finalThreadNotifyEmbed = new EmbedBuilder()
+                        // //     .setTitle(`MOT History for ${carRegNumber}`)
+                        // //     .setDescription(`MOT History for ${carRegNumber} has been sent to <#${embedsThread['id']}>`)
+                        // //     .setColor("#FFB347")
+                        // //     .setTimestamp();
+                        // // return res.status(200).json({
+                        // //     type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                        // //     data: {
+                        // //         embeds: [finalThreadNotifyEmbed],
+                        // //         flags: InteractionResponseFlags.EPHEMERAL
+                        // //     }
+                        // // });
                         return res.status(200).json({
-                            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                            type: InteractionResponseType.DEFERRED_UPDATE_MESSAGE,
                             data: {
                                 content: "Balls"
                             }
