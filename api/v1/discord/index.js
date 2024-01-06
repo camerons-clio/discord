@@ -54,6 +54,29 @@ export default async function handler(req, res) {
             switch (requestBody.data.name?.toString().toLowerCase()) {
                 case GET_CAR_COMMAND['name'].toString().toLowerCase():
                     try {
+                        // Return a defered response to the user
+                        return res.status(200).json({
+                            type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+                            data: {
+                                flags: InteractionResponseFlags.EPHEMERAL
+                            }
+                        });
+                    } catch(err) {
+                        console.log(`${lcl.red('[Discord - Error]')} ${err['message']}`);
+                        let errorEmbed = new EmbedBuilder()
+                            .setTitle(err['message'] || 'Something went wrong')
+                            .setColor('#FF6961')
+                            .setTimestamp();
+                        return res.status(200).json({
+                            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                            data: {
+                                embeds: [errorEmbed],
+                                flags: InteractionResponseFlags.EPHEMERAL
+                            }
+                        });
+                    }
+                case "disabled":
+                    try {
                         // defer the response
                         let deferResponse = await fetch(`https://discord.com/api/v10/interactions/${requestBody.id}/${requestBody.token}/callback`, {
                             method: 'POST',
@@ -328,6 +351,26 @@ export default async function handler(req, res) {
                         // //     }
                         // // }
                         // // console.log(`${lcl.greenBright('[Discord - Success]')} Sent all embeds to thread ${embedsThread['id']}`);
+
+                        // send final embed to user
+                        let finalThreadNotifyEmbed = new EmbedBuilder()
+                            .setTitle(`MOT History for ${carRegNumber}`)
+                            .setDescription(`MOT History for ${carRegNumber} has been sent to <#1>`)
+                            .setColor("#FFB347")
+                            .setTimestamp();
+                        let updateDeferedResponse = await fetch(`https://discord.com/api/v10/webhooks/${process.env.DCORD_APP_ID}/${requestBody.token}/messages/@original`, {
+                            method: 'PATCH',
+                            headers: {
+                                ...defaultFetchHeaders(),
+                                "Content-Type": 'application/json',
+                            },
+                            body: JSON.stringify({
+                                embeds: [finalThreadNotifyEmbed],
+                                flags: InteractionResponseFlags.EPHEMERAL
+                            })
+                        });
+
+
 
                         // // // send final embed to user
                         // // let finalThreadNotifyEmbed = new EmbedBuilder()
