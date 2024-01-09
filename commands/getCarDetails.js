@@ -155,10 +155,131 @@ module.exports = {
                 }
             }
 
+            // mot data
+            if (motDataRaw.status === 200) {
+                try {
+                    for (let motData of motDataArray) { // 
+                        try {
+                            // car make to title case
+                            let carMake = motData['make'].charAt(0).toUpperCase() + motData['make'].slice(1).toLowerCase();
+
+                            // get the date value - I don't really know what or why this is so broken. This whole API is a mess
+                            let motFirstDate;
+                            if (motData['firstUsedDate']) {
+                                motFirstDate = dateTime(new Date(motData['firstUsedDate']));
+                            } else if (motData['motTestExpiryDate']) {
+                                motFirstDate = dateTime(new Date(motData['motTestExpiryDate']));
+                            }
+
+                            // base embed
+                            let motTestsEmbed = new EmbedBuilder()
+                                .setTitle(`${carMake} - ${motData['model']} | MOT History`)
+                                .setThumbnail(`https://www.carlogos.org/car-logos/${motData['make'].toLowerCase()}-logo.png`)
+                                .setColor(carColors[motData['primaryColour'].toString().toUpperCase()] || 'Random')
+                                .setFooter({
+                                    "text": `Requested by ${interaction.user.username}`,
+                                    "iconURL": interaction.user.avatarURL()
+                                });
+
+                            // add the optional data fields
+                            if (!motData['motTests'] || motData['motTests'].length <= 0) {
+                                // no test have been done yet or they dont exist for some reason
+                                motTestsEmbed.setDescription(`No MOT Tests Found... First Test Due [${motFirstDate['relativeTime'].replace("in", "within")}](https://www.gov.uk/check-mot-history "${motFirstDate['date']}${motFirstDate['ordinal']} ${motFirstDate['monthName']}${motFirstDate['year'] !== dateTime(new Date())['year'] ? ` ${motFirstDate['year']}` : ''}")`);
+                            } else {
+                                motTestsEmbed.setDescription(`${motData['motTests'].length} MOT Test${motData['motTests'].length > 1 ? "s" : ""} Found... First Test Date [${motFirstDate['relativeTime']}](https://www.gov.uk/check-mot-history "${motFirstDate['date']}${motFirstDate['ordinal']} ${motFirstDate['monthName']}${motFirstDate['year'] !== dateTime(new Date())['year'] ? ` ${motFirstDate['year']}` : ''}")`);
+                            }
+                            createdEmbeds.push(motTestsEmbed);
+
+                            // create the embeds for each test
+                            let motTestEmbeds = [];
+                            for (let motTestIndex in motData['motTests']) {
+                                try {
+                                    let currentTestEmbed = [];
+                                    let motTest = motData['motTests'][motTestIndex];
+                                    let motTestDate = dateTime(new Date(motTest['completedDate']));
+
+                                    // find the color for the embed
+                                    let embedColor = "Random"; // we should never get a random color.... but just in case (The docs for the MOT API are not very good)
+                                    switch (motTest['testResult']) {
+                                        case "PASSED":
+                                            embedColor = "DarkGreen";
+                                            break;
+                                        case "FAILED":
+                                        case "ABANDON":
+                                            embedColor = "DarkRed";
+                                            break;
+                                        case "ABORT":
+                                            embedColor = "DarkBlue";
+                                            break;
+                                    }
+
+                                    // build embed
+                                    let motTestEmbed = new EmbedBuilder()
+                                        .setTitle(`${motTest['testResult'].charAt(0).toUpperCase() + motTest['testResult'].slice(1).toLowerCase()} | MOT Test ${parseInt(motTestIndex) + 1} / ${motData['motTests'].length}`)
+                                        .setColor(embedColor)
+                                        .addFields([
+                                            { "name": "Test Date", "value": `${motTestDate['time']['hours']}:${motTestDate['time']['minutes']} ${motTestDate['date']}${motTestDate['ordinal']} ${motTestDate['monthName']} ${motTestDate['year']}`, "inline": true },
+                                        ])
+                                        .setFooter({
+                                            "text": `MOT Test Number: ${motTest['motTestNumber']}`,
+                                        });
+                                    if (motTest['expiryDate']) {
+                                        let motExpiryDate = dateTime(new Date(motTest['expiryDate']));
+                                        let currentDate = dateTime(new Date());
+                                        motTestEmbed.addFields([{ "name": "Expires", "value": `${motExpiryDate['date']}${motExpiryDate['ordinal']} ${motExpiryDate['monthName']}${motExpiryDate['year'] !== currentDate['year'] ? ` ${motExpiryDate['year']}` : ''}`, "inline": true }]);
+                                    } else {
+                                        motTestEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                                    }
+                                    motTestEmbed.addFields([{ "name": "Mileage at MOT", "value": `${motTest['odometerValue'].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${motTest['odometerUnit']}`, "inline": true }]);
+
+                                    // add the fail reasons
+                                    let amountOfEmbedFields = 3;
+                                    let rfrAndComments = [...motTest['rfrAndComments'].filter(rfr => rfr['type'] === "FAIL"), ...motTest['rfrAndComments'].filter(rfr => rfr['type'] === "MINOR"), ...motTest['rfrAndComments'].filter(rfr => rfr['type'] === "ADVISORY"), ...motTest['rfrAndComments'].filter(rfr => rfr['type'] !== "FAIL" && rfr['type'] !== "MINOR" && rfr['type'] !== "ADVISORY")];
+                                    for (let reasonForRefusal of rfrAndComments) {
+                                        if (amountOfEmbedFields >= 25) {
+                                            // we have maxed out the amount of fields we can have in an embed
+                                            currentTestEmbed.push(motTestEmbed);
+                                            // make a new embed
+                                            motTestEmbed = new EmbedBuilder()
+                                                .setTitle(`${motTest['testResult'].charAt(0).toUpperCase() + motTest['testResult'].slice(1).toLowerCase()} | MOT Test ${parseInt(motTestIndex) + 1} / ${motData['motTests'].length} (Continued)`)
+                                                .setColor(embedColor) // we should never get a random color.... but just in case (The docs for the MOT API are not very good)
+                                                .setFooter({
+                                                    "text": `MOT Test Number: ${motTest['motTestNumber']}`,
+                                                });
+                                            amountOfEmbedFields = 0;
+                                        }
+
+                                        // add the field
+                                        motTestEmbed.addFields({ "name": `${reasonForRefusal['type'].charAt(0).toUpperCase() + reasonForRefusal['type'].slice(1).toLowerCase()}`, "value": `${reasonForRefusal['text']}` });
+                                        amountOfEmbedFields++;
+                                    }
+
+                                    // add the embed data
+                                    currentTestEmbed.push(motTestEmbed);
+                                    motTestEmbeds.push(...currentTestEmbed);
+                                } catch (err) {
+                                    console.log(err);
+                                    console.log(`${lcl.redBright('[DVLA - Error]')} Failed to create MOT test data: ${err}`);
+                                }
+                            }
+
+                            // add the embeds to the created embeds array
+                            createdEmbeds.push(...motTestEmbeds);
+                        } catch (err) {
+                            console.log(err);
+                            console.log(`${lcl.redBright('[DVLA - Error]')} Failed to create MOT data: ${err}`);
+                        }
+                    }
+                } catch (err) {
+                    console.log(err);
+                    console.log(`${lcl.redBright('[DVLA - Error]')} Failed to format MOT data: ${err}`);
+                }
+            }
 
             // Send Embeds
+            if (createdEmbeds.length <= 0) throw new Error("No Data Found for that Registration Number");
             return await interaction.editReply({
-                embeds: createdEmbeds,
+                embeds: createdEmbeds.splice(0, 10),
                 ephemeral: true
             });
         } catch (err) {
