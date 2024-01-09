@@ -3,6 +3,7 @@ const { EmbedBuilder } = require('discord.js');
 const { InteractionResponseType, InteractionResponseFlags, InteractionType, verifyKey } = require('discord-interactions');
 const defaultFetchHeaders = require('../../utils/defaultFetchHeaders');
 const dateTime = require('../../utils/dateTime');
+const superagent = require('superagent'); // Something is wrong with the fetch API somewhere 
 
 // The DVLA Returns the color as a work like "BLUE" or "RED" so we need to convert it to a hex code for the embed
 const { GET_CAR_COMMAND } = require('../../utils/discordCommands');
@@ -54,6 +55,29 @@ export default async function handler(req, res) {
             let commandName = requestBody.data.name?.toString().toLowerCase();
             console.log(`${lcl.blueBright('[Discord - Info]')} Received command: "${commandName}"`);
             switch (commandName) {
+                case GET_CAR_COMMAND.name.toLowerCase():
+                    let carReg = requestBody.data.options[0].value.toUpperCase();
+                    console.log(`${lcl.blueBright('[Discord - Info]')} Car registration: "${carReg}"`);
+
+                    // test fetch
+                    let fetchRes = await superagent.post(`https://httpbin.org/post`);
+                    console.log(fetchRes.body);
+
+                    // sleep for a second
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    // respond with car reg
+                    let carRegEmbed = new EmbedBuilder()
+                        .setTitle(`Car registration: ${carReg}`)
+                        .setDescription(`Loading...`)
+                        .setColor('#FF6961')
+                        .setTimestamp();
+                    return res.status(200).json({
+                        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                        data: {
+                            embeds: [carRegEmbed.toJSON()]
+                        }
+                    });
                 default:
                     console.log(`${lcl.yellowBright('[Discord - Warn]')} Unknown command: "${commandName}"`);
                     let errorEmbed = new EmbedBuilder()
