@@ -107,7 +107,7 @@ try {
         }
 
         // set the bot to online
-        await client.user.setPresence({ activities: [{ name: 'Cameron\'s MOT', type: ActivityType.Idle }], status: 'watching' });
+        await client.user.setPresence({ activities: [{ name: 'Cameron\'s MOT', type: ActivityType.Watching }], status: 'online' });
 
         // finish
         clientOnline = true;
