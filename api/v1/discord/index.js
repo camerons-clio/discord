@@ -1,10 +1,9 @@
 const lcl = require('cli-color');
 const { EmbedBuilder } = require('discord.js');
 const { InteractionResponseType, InteractionResponseFlags, InteractionType } = require('discord-interactions');
-const { verify } = require('discord-verify');
+const { verify, PlatformAlgorithm } = require('discord-verify/node');
 const defaultFetchHeaders = require('../../utils/defaultFetchHeaders');
 const dateTime = require('../../utils/dateTime');
-const fetch = require('node-fetch');
 
 // The DVLA Returns the color as a work like "BLUE" or "RED" so we need to convert it to a hex code for the embed
 const { GET_CAR_COMMAND } = require('../../utils/discordCommands');
@@ -33,7 +32,8 @@ export default async function handler(req, res) {
             requestSignature,
             requestTimestamp,
             process.env.DCORD_PUBLIC_KEY,
-            crypto.subtle
+            crypto.subtle,
+            PlatformAlgorithm.Vercel
         );
         if (!isVerified) {
             let error = new Error('Unauthorized');
@@ -52,14 +52,16 @@ export default async function handler(req, res) {
             });
         }
 
+        // handle app command
         if (requestBody.type === InteractionType.APPLICATION_COMMAND) {
-            console.log(`${lcl.blueBright('[Discord - Info]')} Received command: "${requestBody.data.name}"`);
-            switch (requestBody.data.name?.toString().toLowerCase()) {
+            let commandName = requestBody.data.name?.toString().toLowerCase();
+            console.log(`${lcl.blueBright('[Discord - Info]')} Received command: "${commandName}"`);
+            switch (commandName) {
                 default:
-                    console.log(`${lcl.yellowBright('[Discord - Warn]')} Unknown command: "${requestBody.data.name}"`);
+                    console.log(`${lcl.yellowBright('[Discord - Warn]')} Unknown command: "${commandName}"`);
                     let errorEmbed = new EmbedBuilder()
                         .setTitle('Unknown command')
-                        .setDescription(`The command "${requestBody.data.name}" is unknown. Please try again.`)
+                        .setDescription(`The command "${commandName}" is unknown. Please try again.`)
                         .setColor('#FF6961')
                         .setTimestamp();
                     return res.status(200).json({
