@@ -104,7 +104,7 @@ module.exports = {
                         vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
                     }
                     if (vesData['engineCapacity']) {
-                        let roundedEngineCapacity = Math.floor((Math.ceil(vesData['engineCapacity'] / 100) * 100) / 1000).toFixed(1);
+                        let roundedEngineCapacity = (Math.ceil(vesData['engineCapacity'] / 100) / 10).toFixed(1);
                         vesEmbed.addFields([{ "name": "Engine Capacity", "value": `${roundedEngineCapacity}L`, "inline": true }]);
                     } else {
                         vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
