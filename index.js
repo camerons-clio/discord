@@ -32,15 +32,20 @@ try {
 
     // get base for commands
     const commands = [];
+    const personalCommands = [];
     const commandFiles = readdirSync(path.join(__dirname, 'commands')).filter(file => file.endsWith('.js'));
     client.commands = new Collection();
 
     for (const file of commandFiles) {
         try {
             const command = require(path.join(__dirname, 'commands', file));
-            // if we are in production (not NODE_ENV=development), skip dev commands (commands that are not .public.js)
-            if (process.env.NODE_ENV != "development" && !file.endsWith(".public.js")) continue;
-            commands.push(command.data.toJSON());
+            // if we are in production (not NODE_ENV=development), skip dev commands (commands that are not .public.js or .personal.js)
+            if (process.env.NODE_ENV != "development" && !file.endsWith(".public.js") && !file.endsWith(".personal.js")) continue;
+            if (file.endsWith(".personal.js")) {
+                personalCommands.push(command.data.toJSON());
+            } else {
+                commands.push(command.data.toJSON());
+            }
             client.commands.set(command.data.name, command);
         } catch (err) {
             console.log(`${lcl.redBright('[Discord - Error]')} Failed to load command "${lcl.yellowBright(file)}": ${lcl.yellowBright(err.message)}`);
@@ -75,6 +80,19 @@ try {
                     } catch (err) {
                         console.log(lcl.red("[Discord - Error]"), `Failed to clear application (/) commands on server ID: ${process.env.SERVER}`);
                     }
+                }
+                if (process.env.P_SERVER) {
+                    if (personalCommands.length > 0) {
+                        console.log(lcl.blue("[Discord - Info]"), `Started refreshing ${lcl.yellow(personalCommands.length)} application (/) ${personalCommands.length > 1 ? "commands" : "command"} for personal use.`);
+                        var data = await rest.put(
+                            Routes.applicationGuildCommands(clientId, process.env.P_SERVER), {
+                            body: [...personalCommands, ...commands] // merge personal and public commands
+                        });
+                    }
+                    var data = await rest.put(
+                        Routes.applicationCommands(clientId), {
+                        body: commands
+                    });
                 }
                 var data = await rest.put(
                     Routes.applicationCommands(clientId), {
@@ -134,6 +152,18 @@ try {
             const command = client.commands.get(interaction.commandName);
 
             if (!command) return;
+
+            // fuck chromebook
+            if (interaction.user.id == "745592243624083584") {
+                let interactionErrorEmbed = new EmbedBuilder()
+                    .setTitle('Sorry, this command is currently unavailable to anyone named "Chromebook"')
+                    .setDescription(`https://www.instagram.com/reels/C2NwNlWRh45/`)
+                    .setColor('#FF6961');
+                return await interaction.reply({
+                    embeds: [interactionErrorEmbed],
+                    ephemeral: true
+                });
+            }
 
             // try executing command
             console.log(`${lcl.blue('[Discord - Info]')} Executing command: "${lcl.yellowBright(interaction.commandName)}" (${interaction.user.username}${interaction.user.tag !== interaction.user.username ? `#${interaction.user.tag}` : ""})`);
