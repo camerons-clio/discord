@@ -19,9 +19,9 @@ module.exports = {
         .setDescription('Get a car\'s MOT and Vehicle Information')
         .addStringOption(option =>
             option.setName('reg')
-                .setDescription('The license plate of the car. Without spaces.')
+                .setDescription('The license plate of the car.')
                 .setMinLength(2)
-                .setMaxLength(7)
+                .setMaxLength(8)
                 .setRequired(true)),
     async execute(interaction) {
         await interaction.deferReply({
@@ -31,6 +31,7 @@ module.exports = {
         try {
             if (!process.env.GOV_VES_KEY || !process.env.GOV_MOT_KEY) throw new Error("Missing API Keys for VES and/or MOT");
             const carRegNumber = interaction.options.getString('reg')?.toString().replace(/\s/g, '').toUpperCase().trim();
+            if (!carRegNumber) throw new Error("Invalid Car Registration Number");
 
             // get Vehicle Enquiry Service Data
             let vesDataRaw = await fetch(`https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles`, {
@@ -77,80 +78,99 @@ module.exports = {
                         });
 
                     // the ves api will only return keys if they have a value so we need to check if they exist
-                    vesEmbed.addFields([{ "name": "Make", "value": carMake, "inline": true }])
-                    if (vesData['monthOfFirstRegistration']) {
-                        // the first registration date is in the format "YYYY-MM"
-                        let firstRegMonth = parseInt(vesData['monthOfFirstRegistration'].split("-")[1]);
-                        let firstRegYear = parseInt(vesData['monthOfFirstRegistration'].split("-")[0]);
-                        vesEmbed.addFields([{ "name": "First Registered", "value": `${registerMonthNames[firstRegMonth - 1]} ${firstRegYear}`, "inline": true }]);
-                    } else {
-                        vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
-                    }
-                    if (vesData['monthOfFirstDvlaRegistration']) {
-                        // again based on the format "YYYY-MM"
-                        let firstDvlaRegMonth = parseInt(vesData['monthOfFirstDvlaRegistration'].split("-")[1]);
-                        let firstDvlaRegYear = parseInt(vesData['monthOfFirstDvlaRegistration'].split("-")[0]);
-                        vesEmbed.addFields([{ "name": "First Registered with DVLA", "value": `${registerMonthNames[firstDvlaRegMonth - 1]} ${firstDvlaRegYear}`, "inline": true }]);
-                    } else {
-                        vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                    vesEmbed.addFields([{ "name": "Make", "value": carMake, "inline": true }]);
+                    try {
+                        if (vesData['monthOfFirstRegistration']) {
+                            // the first registration date is in the format "YYYY-MM"
+                            let firstRegMonth = parseInt(vesData['monthOfFirstRegistration'].split("-")[1]);
+                            let firstRegYear = parseInt(vesData['monthOfFirstRegistration'].split("-")[0]);
+                            vesEmbed.addFields([{ "name": "First Registered", "value": `${registerMonthNames[firstRegMonth - 1]} ${firstRegYear}`, "inline": true }]);
+                        } else {
+                            vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                        }
+                        if (vesData['monthOfFirstDvlaRegistration']) {
+                            // again based on the format "YYYY-MM"
+                            let firstDvlaRegMonth = parseInt(vesData['monthOfFirstDvlaRegistration'].split("-")[1]);
+                            let firstDvlaRegYear = parseInt(vesData['monthOfFirstDvlaRegistration'].split("-")[0]);
+                            vesEmbed.addFields([{ "name": "First Registered with DVLA", "value": `${registerMonthNames[firstDvlaRegMonth - 1]} ${firstDvlaRegYear}`, "inline": true }]);
+                        } else {
+                            vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                        }
+                    } catch (err) {
+                        console.log(err);
+                        console.log(`${lcl.redBright('[DVLA - Error]')} Error Creating Registration Data: ${err}`);
                     }
 
                     // fuel data
-                    if (vesData['fuelType']) {
-                        // we need to take each word and title case it
-                        let fuelType = vesData['fuelType'].split(" ").map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(" ");
-                        vesEmbed.addFields([{ "name": "Fuel Type", "value": fuelType, "inline": true }]);
-                    } else {
-                        vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
-                    }
-                    if (vesData['engineCapacity']) {
-                        let roundedEngineCapacity = (Math.ceil(vesData['engineCapacity'] / 100) / 10).toFixed(1);
-                        vesEmbed.addFields([{ "name": "Engine Capacity", "value": `${roundedEngineCapacity}L`, "inline": true }]);
-                    } else {
-                        vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
-                    }
-                    if (vesData['co2Emissions']) {
-                        vesEmbed.addFields([{ "name": "CO2 Emissions", "value": `${vesData['co2Emissions']}g/km`, "inline": true }]);
-                    } else {
-                        vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                    try {
+                        if (vesData['fuelType']) {
+                            // we need to take each word and title case it
+                            let fuelType = vesData['fuelType'].split(" ").map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(" ");
+                            vesEmbed.addFields([{ "name": "Fuel Type", "value": fuelType, "inline": true }]);
+                        } else {
+                            vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                        }
+                        if (vesData['engineCapacity']) {
+                            let roundedEngineCapacity = (Math.ceil(vesData['engineCapacity'] / 100) / 10).toFixed(1);
+                            vesEmbed.addFields([{ "name": "Engine Capacity", "value": `${roundedEngineCapacity}L`, "inline": true }]);
+                        } else {
+                            vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                        }
+                        if (vesData['co2Emissions']) {
+                            vesEmbed.addFields([{ "name": "CO2 Emissions", "value": `${vesData['co2Emissions']}g/km`, "inline": true }]);
+                        } else {
+                            vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                        }
+                    } catch (err) {
+                        console.log(err);
+                        console.log(`${lcl.redBright('[DVLA - Error]')} Error Creating Fuel Data: ${err}`);
                     }
 
                     // tax data
-                    if (vesData['taxStatus']) {
-                        vesEmbed.addFields([{ "name": "Tax Status", "value": vesData['taxStatus'], "inline": true }]);
-                    } else {
-                        vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
-                    }
-                    if (vesData['taxDueDate']) {
-                        let currentDate = dateTime(new Date());
-                        let taxDueDate = dateTime(new Date(vesData['taxDueDate']));
-                        vesEmbed.addFields([{ "name": "Tax Due", "value": `[Due ${taxDueDate['relativeTime']}](https://www.gov.uk/check-vehicle-tax "${taxDueDate['date']}${taxDueDate['ordinal']} ${taxDueDate['monthName']}${currentDate['year'] !== taxDueDate['year'] ? ` ${taxDueDate['year']}` : ''}")`, "inline": true }]);
-                    } else {
-                        vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
-                    }
-                    if (vesData['artEndDate']) {
-                        let currentDate = dateTime(new Date());
-                        let artEndDate = dateTime(new Date(vesData['artEndDate']));
-                        vesEmbed.addFields([{ "name": "ART Ends", "value": `[${artEndDate['relativeTime'].charAt(0).toUpperCase() + artEndDate['relativeTime'].slice(1).toLowerCase()}](https://www.gov.uk/check-vehicle-tax "${artEndDate['date']}${artEndDate['ordinal']} ${artEndDate['monthName']}${currentDate['year'] !== artEndDate['year'] ? ` ${artEndDate['year']}` : ''}")`, "inline": true }]);
-                    } else {
-                        vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                    try {
+                        if (vesData['taxStatus']) {
+                            vesEmbed.addFields([{ "name": "Tax Status", "value": vesData['taxStatus'], "inline": true }]);
+                        } else {
+                            vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                        }
+                        if (vesData['taxDueDate']) {
+                            let currentDate = dateTime(new Date());
+                            let taxDueDate = dateTime(new Date(vesData['taxDueDate']));
+                            vesEmbed.addFields([{ "name": "Tax Due", "value": `[Due ${taxDueDate['relativeTime']}](https://www.gov.uk/check-vehicle-tax "${taxDueDate['date']}${taxDueDate['ordinal']} ${taxDueDate['monthName']}${currentDate['year'] !== taxDueDate['year'] ? ` ${taxDueDate['year']}` : ''}")`, "inline": true }]);
+                        } else {
+                            vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                        }
+                        if (vesData['artEndDate']) {
+                            let currentDate = dateTime(new Date());
+                            let artEndDate = dateTime(new Date(vesData['artEndDate']));
+                            vesEmbed.addFields([{ "name": "ART Ends", "value": `[${artEndDate['relativeTime'].charAt(0).toUpperCase() + artEndDate['relativeTime'].slice(1).toLowerCase()}](https://www.gov.uk/check-vehicle-tax "${artEndDate['date']}${artEndDate['ordinal']} ${artEndDate['monthName']}${currentDate['year'] !== artEndDate['year'] ? ` ${artEndDate['year']}` : ''}")`, "inline": true }]);
+                        } else {
+                            vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                        }
+                    } catch (err) {
+                        console.log(err);
+                        console.log(`${lcl.redBright('[DVLA - Error]')} Error Creating Tax Data: ${err}`);
                     }
 
                     // mot data
-                    if (vesData['motStatus']) {
-                        vesEmbed.addFields([{ "name": "MOT Status", "value": vesData['motStatus'], "inline": true }]);
-                    } else {
+                    try {
+                        if (vesData['motStatus']) {
+                            vesEmbed.addFields([{ "name": "MOT Status", "value": vesData['motStatus'], "inline": true }]);
+                        } else {
+                            vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                        }
+                        if (vesData['motExpiryDate']) {
+                            let currentDate = dateTime(new Date());
+                            let motExpiryDate = dateTime(new Date(vesData['motExpiryDate']));
+                            vesEmbed.addFields([{ "name": "MOT Due", "value": `[Due ${motExpiryDate['relativeTime']}](https://www.gov.uk/check-mot-history "${motExpiryDate['date']}${motExpiryDate['ordinal']} ${motExpiryDate['monthName']}${currentDate['year'] !== motExpiryDate['year'] ? ` ${motExpiryDate['year']}` : ''}")`, "inline": true }]);
+                        } else {
+                            vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                        }
                         vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
+                    } catch (err) {
+                        console.log(err);
+                        console.log(`${lcl.redBright('[DVLA - Error]')} Error Creating MOT Data: ${err}`);
                     }
-                    if (vesData['motExpiryDate']) {
-                        let currentDate = dateTime(new Date());
-                        let motExpiryDate = dateTime(new Date(vesData['motExpiryDate']));
-                        vesEmbed.addFields([{ "name": "MOT Due", "value": `[Due ${motExpiryDate['relativeTime']}](https://www.gov.uk/check-mot-history "${motExpiryDate['date']}${motExpiryDate['ordinal']} ${motExpiryDate['monthName']}${currentDate['year'] !== motExpiryDate['year'] ? ` ${motExpiryDate['year']}` : ''}")`, "inline": true }]);
-                    } else {
-                        vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
-                    }
-                    vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
-
 
                     createdEmbeds.push(vesEmbed);
                 } catch (err) {
@@ -165,7 +185,7 @@ module.exports = {
                     for (let motData of motDataArray) { // 
                         try {
                             // car make to title case
-                            let carMake = motData['make'].charAt(0).toUpperCase() + motData['make'].slice(1).toLowerCase();
+                            let carMake = motData['make']?.toString().charAt(0).toUpperCase() + motData['make']?.toString().slice(1).toLowerCase();
 
                             // base embed
                             let motTestsEmbed = new EmbedBuilder()
@@ -184,11 +204,8 @@ module.exports = {
                                 let motFirstDate = await dateTime(new Date(motData['motTestExpiryDate']));
                                 motTestsEmbed.setDescription(`No MOT Tests Found... First Test Due [${motFirstDate['relativeTime'].replace("in", "within")}](https://www.gov.uk/check-mot-history "${motFirstDate['date']}${motFirstDate['ordinal']} ${motFirstDate['monthName']}${motFirstDate['year'] !== dateTime(new Date())['year'] ? ` ${motFirstDate['year']}` : ''}")`);
                             } else {
-                                // add 3 to the year as the first mot is due 3 years after the first registration
-                                let firstRegDate = new Date(motData['firstUsedDate']);
-                                firstRegDate.setFullYear(firstRegDate.getFullYear() + 3);
-                                let motFirstDate = dateTime(firstRegDate);
-
+                                // get the first test from the data (the first test is the last of the array)
+                                let motFirstDate = await dateTime(new Date(motData['motTests'][motData['motTests'].length - 1]['completedDate']));
                                 motTestsEmbed.setDescription(`${motData['motTests'].length} MOT Test${motData['motTests'].length > 1 ? "s" : ""} Found... First Test Date [${motFirstDate['relativeTime']}](https://www.gov.uk/check-mot-history "${motFirstDate['date']}${motFirstDate['ordinal']} ${motFirstDate['monthName']}${motFirstDate['year'] !== dateTime(new Date())['year'] ? ` ${motFirstDate['year']}` : ''}")\n\n**The MOT test changed on 20th May 2018.**\nDefects are now categorised according to their severity - dangerous, major, and minor.`);
                             }
                             createdEmbeds.push(motTestsEmbed);
@@ -279,6 +296,9 @@ module.exports = {
                 }
             }
 
+            // check if we have any embeds to send
+            if (createdEmbeds.length <= 0) throw new Error("No Data Found for that Registration Number");
+
             // split the embeds into groups of 10
             let embedsToSend = [];
             for (let i = 0; i < createdEmbeds.length; i += 10) {
@@ -291,17 +311,34 @@ module.exports = {
                 let channel = guildChannel[1];
                 if (channel['type'] !== 11) continue; // not a thread
                 if (channel['name'] !== carRegNumber) continue; // not the thread we are looking for
-                if (channel['ownerId'] !== interaction.client.user.id) continue;
                 threadChannel = channel;
                 break;
             }
             if (!threadChannel) {
-                // create a new thread
-                threadChannel = await interaction.channel.threads.create({
-                    name: carRegNumber,
-                    autoArchiveDuration: 1440, // 24 hours
-                    reason: `Car Registration Number: ${carRegNumber} for ${interaction.user.username}`
-                });
+                let validChannelType = false;
+                try {
+                    // get the channel that we are currently in
+                    let interactionChannel = interaction.channel;
+
+                    // You can only create threads in actual text channels so we need to filter out only regular text channels and therads 
+                    if (interactionChannel.type.toString() === "0") validChannelType = true;
+                    if (interactionChannel.type.toString() === "11") validChannelType = true;
+                    if (!validChannelType) throw new Error("Invalid Channel Type");
+
+                    // we need to check to see if we are in a channel or a thread, if we are in a thread we need to get the parent channel
+                    if (interactionChannel.type.toString() === "11") interactionChannel = await interaction.guild.channels.fetch(interactionChannel.parentId);
+
+                    // create a new thread
+                    threadChannel = await interactionChannel.threads.create({
+                        name: carRegNumber,
+                        autoArchiveDuration: 1440, // 24 hours
+                        reason: `Car Registration Number: ${carRegNumber} for ${interaction.user.username}`
+                    });
+                } catch (err) {
+                    console.log(err);
+                    console.log(`${lcl.redBright('[DVLA - Error]')} Failed to create thread: ${err}`);
+                    throw new Error(!validChannelType ? "This command only works in a regular text channel" : "Failed to create a thread for the car registration number");
+                }
             }
 
             // send embeds
@@ -312,7 +349,6 @@ module.exports = {
             }
 
             // Send Embeds
-            if (createdEmbeds.length <= 0) throw new Error("No Data Found for that Registration Number");
             let finalEmbed = new EmbedBuilder()
                 .setTitle(`Sent ${createdEmbeds.length} embed${createdEmbeds.length > 1 ? "s" : ""} to ${threadChannel.toString()}`)
                 .setColor('DarkGreen')

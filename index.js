@@ -153,11 +153,11 @@ try {
 
             if (!command) return;
 
-            // fuck chromebook
+            // fuck chromebook (745592243624083584)
             if (interaction.user.id == "745592243624083584") {
                 let interactionErrorEmbed = new EmbedBuilder()
-                    .setTitle('Sorry, this command is currently unavailable to anyone named "Chromebook"')
-                    .setDescription(`https://www.instagram.com/reels/C2NwNlWRh45/`)
+                    .setTitle('Sorry, this command is unavailable to anyone named "Chromebook"')
+                    .setImage(`https://i.imgur.com/d3IkL82.png`)
                     .setColor('#FF6961');
                 return await interaction.reply({
                     embeds: [interactionErrorEmbed],
