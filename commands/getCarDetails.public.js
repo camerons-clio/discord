@@ -162,7 +162,7 @@ module.exports = {
                         if (vesData['motExpiryDate']) {
                             let currentDate = dateTime(new Date());
                             let motExpiryDate = dateTime(new Date(vesData['motExpiryDate']));
-                            vesEmbed.addFields([{ "name": "MOT Due", "value": `[Due ${motExpiryDate['relativeTime']}](https://www.gov.uk/check-mot-history "${motExpiryDate['date']}${motExpiryDate['ordinal']} ${motExpiryDate['monthName']}${currentDate['year'] !== motExpiryDate['year'] ? ` ${motExpiryDate['year']}` : ''}")`, "inline": true }]);
+                            vesEmbed.addFields([{ "name": "MOT Due", "value": `[Due ${motExpiryDate['relativeTime']}](https://www.check-mot.service.gov.uk/results?registration=${vesData['registrationNumber']}&checkRecalls=true "${motExpiryDate['date']}${motExpiryDate['ordinal']} ${motExpiryDate['monthName']}${currentDate['year'] !== motExpiryDate['year'] ? ` ${motExpiryDate['year']}` : ''}")`, "inline": true }]);
                         } else {
                             vesEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
                         }
@@ -199,15 +199,18 @@ module.exports = {
                                 });
 
                             // add the optional data fields
-                            if (!motData['motTests'] || motData['motTests'].length <= 0) {
-                                // no test have been done yet or they dont exist for some reason
-                                let motFirstDate = await dateTime(new Date(motData['motTestExpiryDate']));
-                                motTestsEmbed.setDescription(`No MOT Tests Found... First Test Due [${motFirstDate['relativeTime'].replace("in", "within")}](https://www.gov.uk/check-mot-history "${motFirstDate['date']}${motFirstDate['ordinal']} ${motFirstDate['monthName']}${motFirstDate['year'] !== dateTime(new Date())['year'] ? ` ${motFirstDate['year']}` : ''}")`);
-                            } else {
-                                // get the first test from the data (the first test is the last of the array)
-                                let motFirstDate = await dateTime(new Date(motData['motTests'][motData['motTests'].length - 1]['completedDate']));
-                                motTestsEmbed.setDescription(`${motData['motTests'].length} MOT Test${motData['motTests'].length > 1 ? "s" : ""} Found... First Test Date [${motFirstDate['relativeTime']}](https://www.gov.uk/check-mot-history "${motFirstDate['date']}${motFirstDate['ordinal']} ${motFirstDate['monthName']}${motFirstDate['year'] !== dateTime(new Date())['year'] ? ` ${motFirstDate['year']}` : ''}")\n\n**The MOT test changed on 20th May 2018.**\nDefects are now categorised according to their severity - dangerous, major, and minor.`);
+                            // MOT Warning
+                            let motFirstDate = await dateTime(new Date(motData['motTests'][motData['motTests'].length - 1]['completedDate']));
+                            if (new Date(motFirstDate['dateTime']) < new Date("2018-05-20T00:00:00.000Z")) motTestsEmbed.setDescription(`[**The MOT test changed on 20th May 2018.**](https://www.gov.uk/government/news/mot-changes-20-may-2018)`)
+
+                            // first registration date
+                            if (motData['firstUsedDate']) {
+                                let firstUsedDate = await dateTime(new Date(motData['firstUsedDate']));
+                                motTestsEmbed.addFields([{ "name": "First Registered", "value": `${firstUsedDate['date']}${firstUsedDate['ordinal']} ${firstUsedDate['monthName']} ${firstUsedDate['year']}`, "inline": true }]);
                             }
+
+                            // first test date
+                            motTestsEmbed.addFields([{ "name": "First Test Date", "value": `[${motFirstDate['relativeTime']}](https://www.check-mot.service.gov.uk/results?registration=${vesData['registrationNumber']}&checkRecalls=true "${motFirstDate['date']}${motFirstDate['ordinal']} ${motFirstDate['monthName']}${motFirstDate['year'] !== dateTime(new Date())['year'] ? ` ${motFirstDate['year']}` : ''}")`, "inline": true }]);
                             createdEmbeds.push(motTestsEmbed);
 
                             // create the embeds for each test
@@ -246,7 +249,12 @@ module.exports = {
                                     if (motTest['expiryDate']) {
                                         let motExpiryDate = dateTime(new Date(motTest['expiryDate']));
                                         let currentDate = dateTime(new Date());
-                                        motTestEmbed.addFields([{ "name": "Expires", "value": `${motExpiryDate['date']}${motExpiryDate['ordinal']} ${motExpiryDate['monthName']}${motExpiryDate['year'] !== currentDate['year'] ? ` ${motExpiryDate['year']}` : ''}`, "inline": true }]);
+
+                                        // assume the test has expired by default unless the date is in the future
+                                        let testStatus = "Expired";
+                                        if (new Date(motExpiryDate['dateTime']) > new Date()) testStatus = "Expires";
+
+                                        motTestEmbed.addFields([{ "name": testStatus, "value": `${motExpiryDate['date']}${motExpiryDate['ordinal']} ${motExpiryDate['monthName']}${motExpiryDate['year'] !== currentDate['year'] ? ` ${motExpiryDate['year']}` : ''}`, "inline": true }]);
                                     } else {
                                         motTestEmbed.addFields([{ "name": "\u200b", "value": "\u200b", "inline": true }]);
                                     }

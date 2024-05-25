@@ -30,13 +30,19 @@ function formatDateTime(funcDate) {
         // relative time from now eg "3 hours ago" or "in 3 days"
         let now = new Date();
         let diff = now.getTime() - date.getTime();
+        let diffYears = Math.floor(diff / (1000 * 3600 * 24 * 30 * 12));
+        let diffMonths = Math.floor(diff / (1000 * 3600 * 24 * 30));
         let diffDays = Math.floor(diff / (1000 * 3600 * 24));
         let diffHours = Math.floor(diff / (1000 * 3600));
         let diffMinutes = Math.floor(diff / (1000 * 60));
         let diffSeconds = Math.floor(diff / (1000));
 
         let relativeTime = "";
-        if (diffDays > 0) {
+        if (diffYears > 0) {
+            relativeTime = `${diffYears} year${diffYears > 1 ? "s" : ""} ago`;
+        } else if (diffMonths > 0) {
+            relativeTime = `${diffMonths} month${diffMonths > 1 ? "s" : ""} ago`;
+        } else if (diffDays > 0) {
             relativeTime = `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
         } else if (diffHours > 0) {
             relativeTime = `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
@@ -44,6 +50,10 @@ function formatDateTime(funcDate) {
             relativeTime = `${diffMinutes} minute${diffMinutes > 1 ? "s" : ""} ago`;
         } else if (diffSeconds > 0) {
             relativeTime = `${diffSeconds} second${diffSeconds > 1 ? "s" : ""} ago`;
+        } else if (diffYears < 0) {
+            relativeTime = `in ${Math.abs(diffYears)} year${diffYears < -1 ? "s" : ""}`;
+        } else if (diffMonths < 0) {
+            relativeTime = `in ${Math.abs(diffMonths)} month${diffMonths < -1 ? "s" : ""}`;
         } else if (diffDays < 0) {
             relativeTime = `in ${Math.abs(diffDays)} day${diffDays < -1 ? "s" : ""}`;
         } else if (diffHours < 0) {
