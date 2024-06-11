@@ -1,7 +1,7 @@
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-function formatDateTime(funcDate) {
+function formatDateTime(funcDate, longRelativeTime = false) {
     try {
         // Get and Check date
         if (!funcDate) funcDate = new Date().toISOString();
@@ -38,9 +38,9 @@ function formatDateTime(funcDate) {
         let diffSeconds = Math.floor(diff / (1000));
 
         let relativeTime = "";
-        if (diffYears > 0) {
+        if (diffYears > 0 && longRelativeTime) {
             relativeTime = `${diffYears} year${diffYears > 1 ? "s" : ""} ago`;
-        } else if (diffMonths > 0) {
+        } else if (diffMonths > 0 && longRelativeTime) {
             relativeTime = `${diffMonths} month${diffMonths > 1 ? "s" : ""} ago`;
         } else if (diffDays > 0) {
             relativeTime = `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
@@ -50,9 +50,9 @@ function formatDateTime(funcDate) {
             relativeTime = `${diffMinutes} minute${diffMinutes > 1 ? "s" : ""} ago`;
         } else if (diffSeconds > 0) {
             relativeTime = `${diffSeconds} second${diffSeconds > 1 ? "s" : ""} ago`;
-        } else if (diffYears < 0) {
+        } else if (diffYears < 0 && longRelativeTime) {
             relativeTime = `in ${Math.abs(diffYears)} year${diffYears < -1 ? "s" : ""}`;
-        } else if (diffMonths < 0) {
+        } else if (diffMonths < 0 && longRelativeTime) {
             relativeTime = `in ${Math.abs(diffMonths)} month${diffMonths < -1 ? "s" : ""}`;
         } else if (diffDays < 0) {
             relativeTime = `in ${Math.abs(diffDays)} day${diffDays < -1 ? "s" : ""}`;

@@ -200,12 +200,15 @@ module.exports = {
 
                             // add the optional data fields
                             // MOT Warning
-                            let motFirstDate = await dateTime(new Date(motData['motTests'][motData['motTests'].length - 1]['completedDate']));
-                            if (new Date(motFirstDate['dateTime']) < new Date("2018-05-20T00:00:00.000Z")) motTestsEmbed.setDescription(`[**The MOT test changed on 20th May 2018.**](https://www.gov.uk/government/news/mot-changes-20-may-2018)`)
+                            var motFirstDate
+                            if (motData['motTests']) {
+                                motFirstDate = await dateTime(new Date(motData['motTests'][motData['motTests'].length - 1]['completedDate']), true);
+                                if (new Date(motFirstDate['dateTime']) < new Date("2018-05-20T00:00:00.000Z")) motTestsEmbed.setDescription(`[**The MOT test changed on 20th May 2018.**](https://www.gov.uk/government/news/mot-changes-20-may-2018)`)
+                            }
 
                             // first registration date
                             if (motData['firstUsedDate']) {
-                                let firstUsedDate = await dateTime(new Date(motData['firstUsedDate']));
+                                let firstUsedDate = await dateTime(new Date(motData['firstUsedDate']), true);
                                 motTestsEmbed.addFields([{ "name": "First Registered", "value": `${firstUsedDate['date']}${firstUsedDate['ordinal']} ${firstUsedDate['monthName']} ${firstUsedDate['year']}`, "inline": true }]);
                             }
 
@@ -305,7 +308,18 @@ module.exports = {
             }
 
             // check if we have any embeds to send
-            if (createdEmbeds.length <= 0) throw new Error("No Data Found for that Registration Number");
+            if (createdEmbeds.length <= 0) {
+                // create error embed
+                let errorEmbed = new EmbedBuilder()
+                    .setTitle(`No Data Found for "${carRegNumber}"`)
+                    .setDescription(`No data was found for the car registration number "${carRegNumber}"`)
+                    .setColor('DarkRed')
+                    .setTimestamp();
+                return await interaction.editReply({
+                    embeds: [errorEmbed],
+                    ephemeral: true
+                });
+            }
 
             // split the embeds into groups of 10
             let embedsToSend = [];
