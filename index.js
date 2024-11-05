@@ -154,16 +154,16 @@ try {
             if (!command) return;
 
             // fuck chromebook (745592243624083584)
-            if (interaction.user.id == "745592243624083584") {
-                let interactionErrorEmbed = new EmbedBuilder()
-                    .setTitle('Sorry, this command is unavailable to anyone named "Chromebook"')
-                    .setImage(`https://i.imgur.com/d3IkL82.png`)
-                    .setColor('#FF6961');
-                return await interaction.reply({
-                    embeds: [interactionErrorEmbed],
-                    ephemeral: true
-                });
-            }
+            // if (interaction.user.id == "745592243624083584") {
+            //     let interactionErrorEmbed = new EmbedBuilder()
+            //         .setTitle('Sorry, this command is unavailable to anyone named "Chromebook"')
+            //         .setImage(`https://i.imgur.com/d3IkL82.png`)
+            //         .setColor('#FF6961');
+            //     return await interaction.reply({
+            //         embeds: [interactionErrorEmbed],
+            //         ephemeral: true
+            //     });
+            // }
 
             // try executing command
             console.log(`${lcl.blue('[Discord - Info]')} Executing command: "${lcl.yellowBright(interaction.commandName)}" (${interaction.user.username}${interaction.user.tag !== interaction.user.username ? `#${interaction.user.tag}` : ""})`);
