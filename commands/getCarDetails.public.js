@@ -29,6 +29,7 @@ const carColors = {
 };
 const registerMonthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const blankField = { "name": "\u200b", "value": "\u200b", "inline": true };
+const EMBED_SIZE_LIMIT = 5500; // safety buffer below Discord's 6000 limit
 
 const logInfo = (message) => console.log(`${lcl.blue('[DVLA - Info]')} ${message}`);
 const logWarn = (message) => console.log(`${lcl.yellow('[DVLA - Warn]')} ${message}`);
@@ -61,36 +62,33 @@ const formatDateTitle = (dateInfo, currentYear) =>
 
 const getUserTag = (user) => `${user.username}${user.tag !== user.username ? `#${user.tag}` : ""}`;
 
+const getTextLength = (value) => {
+    if (value === undefined || value === null) return 0;
+    return value.toString().length;
+};
+
 const getEmbedSize = (embed) => {
     const data = typeof embed.toJSON === 'function' ? embed.toJSON() : (embed.data ?? {});
     let total = 0;
-    if (data.title) total += data.title.length;
-    if (data.description) total += data.description.length;
-    if (data.footer?.text) total += data.footer.text.length;
-    if (data.author?.name) total += data.author.name.length;
+    total += getTextLength(data.title);
+    total += getTextLength(data.description);
+    total += getTextLength(data.footer?.text);
+    total += getTextLength(data.author?.name);
     if (data.fields?.length) {
         for (const field of data.fields) {
-            if (field?.name) total += field.name.length;
-            if (field?.value) total += field.value.length;
+            total += getTextLength(field?.name);
+            total += getTextLength(field?.value);
         }
     }
     return total;
 };
 
-const ensureEmbedSize = (currentEmbed, newField, makeNewEmbed) => {
-    const sizeLimit = 5900; // safety buffer below 6000
-    const projected = getEmbedSize(currentEmbed) + (newField?.name?.length ?? 0) + (newField?.value?.length ?? 0);
-    if (projected > sizeLimit) {
-        return makeNewEmbed();
-    }
-    return currentEmbed;
-};
-
 const truncateText = (value, maxLength) => {
-    if (!value) return value;
-    if (value.length <= maxLength) return value;
-    if (maxLength <= 3) return value.slice(0, maxLength);
-    return `${value.slice(0, maxLength - 3)}...`;
+    if (value === undefined || value === null) return value;
+    const text = value.toString();
+    if (text.length <= maxLength) return text;
+    if (maxLength <= 3) return text.slice(0, maxLength);
+    return `${text.slice(0, maxLength - 3)}...`;
 };
 
 const sanitizeField = (field) => {
@@ -100,7 +98,6 @@ const sanitizeField = (field) => {
 };
 
 const addFieldSafe = (currentEmbed, field, makeNewEmbed, fieldCountRef, baseFieldCount = 0) => {
-    const sizeLimit = 5900; // safety buffer below 6000
     const safeField = sanitizeField(field);
     let targetEmbed = currentEmbed;
 
@@ -110,13 +107,13 @@ const addFieldSafe = (currentEmbed, field, makeNewEmbed, fieldCountRef, baseFiel
     }
 
     const projected = getEmbedSize(targetEmbed) + safeField.name.length + safeField.value.length;
-    if (projected > sizeLimit) {
+    if (projected > EMBED_SIZE_LIMIT) {
         targetEmbed = makeNewEmbed();
         fieldCountRef.value = baseFieldCount;
     }
 
     // If still too big, truncate value to fit remaining space.
-    const remaining = sizeLimit - getEmbedSize(targetEmbed) - safeField.name.length;
+    const remaining = EMBED_SIZE_LIMIT - getEmbedSize(targetEmbed) - safeField.name.length;
     if (remaining < 1) {
         return targetEmbed;
     }
@@ -130,8 +127,7 @@ const addFieldSafe = (currentEmbed, field, makeNewEmbed, fieldCountRef, baseFiel
 };
 
 const trimEmbedToSize = (embed) => {
-    const sizeLimit = 5900;
-    if (getEmbedSize(embed) <= sizeLimit) return embed;
+    if (getEmbedSize(embed) <= EMBED_SIZE_LIMIT) return embed;
 
     let data = embed.toJSON();
     if (data.fields?.length) {
@@ -139,26 +135,43 @@ const trimEmbedToSize = (embed) => {
         embed.setFields(fields);
     }
 
-    if (getEmbedSize(embed) <= sizeLimit) return embed;
+    if (getEmbedSize(embed) <= EMBED_SIZE_LIMIT) return embed;
 
     let fields = (embed.toJSON().fields ?? []).map((field) => ({ ...field }));
-    for (let i = fields.length - 1; i >= 0 && getEmbedSize(embed) > sizeLimit; i--) {
+    for (let i = fields.length - 1; i >= 0 && getEmbedSize(embed) > EMBED_SIZE_LIMIT; i--) {
         fields[i].value = truncateText(fields[i].value, Math.min(fields[i].value.length, 256));
         embed.setFields(fields);
     }
 
-    while (fields.length && getEmbedSize(embed) > sizeLimit) {
+    while (fields.length && getEmbedSize(embed) > EMBED_SIZE_LIMIT) {
         fields.pop();
         embed.setFields(fields);
     }
 
-    if (getEmbedSize(embed) > sizeLimit) {
+    if (getEmbedSize(embed) > EMBED_SIZE_LIMIT) {
         data = embed.toJSON();
         if (data.description) embed.setDescription(truncateText(data.description, 512));
-        if (getEmbedSize(embed) > sizeLimit && data.title) embed.setTitle(truncateText(data.title, 200));
+        if (getEmbedSize(embed) > EMBED_SIZE_LIMIT && data.title) embed.setTitle(truncateText(data.title, 200));
     }
 
     return embed;
+};
+
+const ensureSafeEmbed = (embed) => {
+    if (getEmbedSize(embed) <= EMBED_SIZE_LIMIT) return embed;
+    const trimmed = trimEmbedToSize(embed);
+    if (getEmbedSize(trimmed) <= EMBED_SIZE_LIMIT) return trimmed;
+
+    // Hard fallback: collapse to a minimal embed to avoid API errors.
+    const data = typeof embed.toJSON === 'function' ? embed.toJSON() : (embed.data ?? {});
+    const safeEmbed = new EmbedBuilder()
+        .setTitle(truncateText(data.title ?? "MOT Test", 200))
+        .setDescription("Details too long to display in Discord. Some entries were omitted.")
+        .setColor(data.color ?? "DarkRed");
+    if (data.footer?.text) {
+        safeEmbed.setFooter({ text: truncateText(data.footer.text, 200) });
+    }
+    return safeEmbed;
 };
 
 const getMotAccessToken = async () => {
@@ -626,11 +639,34 @@ module.exports = {
                 });
             }
 
-            const normalizedEmbeds = createdEmbeds.map(trimEmbedToSize);
+            const normalizedEmbeds = createdEmbeds.map(ensureSafeEmbed);
             const embedsToSend = [];
-            for (let i = 0; i < normalizedEmbeds.length; i += 10) {
-                embedsToSend.push(normalizedEmbeds.slice(i, i + 10));
+            const messageEmbedLimit = 10;
+            const messageSizeLimit = 6000; // total char limit across all embeds in a message
+            let currentGroup = [];
+            let currentSize = 0;
+
+            for (const embed of normalizedEmbeds) {
+                const embedSize = getEmbedSize(embed);
+                // logInfo(`Embed size | size=${embedSize} | reg=${carRegNumber}`);
+
+                const wouldExceedCount = currentGroup.length >= messageEmbedLimit;
+                const wouldExceedSize = (currentSize + embedSize) > messageSizeLimit;
+
+                if (currentGroup.length && (wouldExceedCount || wouldExceedSize)) {
+                    embedsToSend.push(currentGroup);
+                    currentGroup = [];
+                    currentSize = 0;
+                }
+
+                currentGroup.push(embed);
+                currentSize += embedSize;
             }
+
+            if (currentGroup.length) {
+                embedsToSend.push(currentGroup);
+            }
+
             logInfo(`Embeds prepared | count=${createdEmbeds.length} | groups=${embedsToSend.length} | reg=${carRegNumber}`);
 
             const threadChannel = await findOrCreateThread(interaction, carRegNumber);
