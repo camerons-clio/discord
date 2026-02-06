@@ -62,7 +62,7 @@ const formatDateTitle = (dateInfo, currentYear) =>
 const getUserTag = (user) => `${user.username}${user.tag !== user.username ? `#${user.tag}` : ""}`;
 
 const getEmbedSize = (embed) => {
-    const data = embed.data ?? {};
+    const data = typeof embed.toJSON === 'function' ? embed.toJSON() : (embed.data ?? {});
     let total = 0;
     if (data.title) total += data.title.length;
     if (data.description) total += data.description.length;
@@ -127,6 +127,38 @@ const addFieldSafe = (currentEmbed, field, makeNewEmbed, fieldCountRef, baseFiel
     targetEmbed.addFields(safeField);
     fieldCountRef.value++;
     return targetEmbed;
+};
+
+const trimEmbedToSize = (embed) => {
+    const sizeLimit = 5900;
+    if (getEmbedSize(embed) <= sizeLimit) return embed;
+
+    let data = embed.toJSON();
+    if (data.fields?.length) {
+        const fields = data.fields.map((field) => sanitizeField(field));
+        embed.setFields(fields);
+    }
+
+    if (getEmbedSize(embed) <= sizeLimit) return embed;
+
+    let fields = (embed.toJSON().fields ?? []).map((field) => ({ ...field }));
+    for (let i = fields.length - 1; i >= 0 && getEmbedSize(embed) > sizeLimit; i--) {
+        fields[i].value = truncateText(fields[i].value, Math.min(fields[i].value.length, 256));
+        embed.setFields(fields);
+    }
+
+    while (fields.length && getEmbedSize(embed) > sizeLimit) {
+        fields.pop();
+        embed.setFields(fields);
+    }
+
+    if (getEmbedSize(embed) > sizeLimit) {
+        data = embed.toJSON();
+        if (data.description) embed.setDescription(truncateText(data.description, 512));
+        if (getEmbedSize(embed) > sizeLimit && data.title) embed.setTitle(truncateText(data.title, 200));
+    }
+
+    return embed;
 };
 
 const getMotAccessToken = async () => {
@@ -594,9 +626,10 @@ module.exports = {
                 });
             }
 
+            const normalizedEmbeds = createdEmbeds.map(trimEmbedToSize);
             const embedsToSend = [];
-            for (let i = 0; i < createdEmbeds.length; i += 10) {
-                embedsToSend.push(createdEmbeds.slice(i, i + 10));
+            for (let i = 0; i < normalizedEmbeds.length; i += 10) {
+                embedsToSend.push(normalizedEmbeds.slice(i, i + 10));
             }
             logInfo(`Embeds prepared | count=${createdEmbeds.length} | groups=${embedsToSend.length} | reg=${carRegNumber}`);
 
