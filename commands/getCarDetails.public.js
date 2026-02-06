@@ -61,6 +61,31 @@ const formatDateTitle = (dateInfo, currentYear) =>
 
 const getUserTag = (user) => `${user.username}${user.tag !== user.username ? `#${user.tag}` : ""}`;
 
+const getEmbedSize = (embed) => {
+    const data = embed.data ?? {};
+    let total = 0;
+    if (data.title) total += data.title.length;
+    if (data.description) total += data.description.length;
+    if (data.footer?.text) total += data.footer.text.length;
+    if (data.author?.name) total += data.author.name.length;
+    if (data.fields?.length) {
+        for (const field of data.fields) {
+            if (field?.name) total += field.name.length;
+            if (field?.value) total += field.value.length;
+        }
+    }
+    return total;
+};
+
+const ensureEmbedSize = (currentEmbed, newField, makeNewEmbed) => {
+    const sizeLimit = 5900; // safety buffer below 6000
+    const projected = getEmbedSize(currentEmbed) + (newField?.name?.length ?? 0) + (newField?.value?.length ?? 0);
+    if (projected > sizeLimit) {
+        return makeNewEmbed();
+    }
+    return currentEmbed;
+};
+
 const getMotAccessToken = async () => {
     if (motAccessToken && motAccessTokenExpiresAt > Date.now() + 60_000) {
         return motAccessToken;
@@ -303,8 +328,8 @@ const buildMotEmbeds = (motData, vesData, interaction) => {
                             break;
                     }
 
-                    let motTestEmbed = new EmbedBuilder()
-                        .setTitle(`${capitalize(motTest.testResult)} | MOT Test ${motTestIndex + 1} / ${motData.motTests.length}`)
+                    const makeMotTestEmbed = (suffix = "") => new EmbedBuilder()
+                        .setTitle(`${capitalize(motTest.testResult)} | MOT Test ${motTestIndex + 1} / ${motData.motTests.length}${suffix}`)
                         .setColor(embedColor)
                         .addFields([
                             { "name": "Test Date", "value": `${motTestDate['time']['hours']}:${motTestDate['time']['minutes']} ${motTestDate['date']}${motTestDate['ordinal']} ${motTestDate['monthName']} ${motTestDate['year']}`, "inline": true },
@@ -312,6 +337,7 @@ const buildMotEmbeds = (motData, vesData, interaction) => {
                         .setFooter({
                             "text": `MOT Test Number: ${motTest.motTestNumber ?? "Unknown"}`,
                         });
+                    let motTestEmbed = makeMotTestEmbed();
                     if (motTest.expiryDate) {
                         const motExpiryDate = dateTime(new Date(motTest.expiryDate));
                         const currentDate = dateTime(new Date());
@@ -331,23 +357,31 @@ const buildMotEmbeds = (motData, vesData, interaction) => {
 
                     let amountOfEmbedFields = 3;
                     const defects = motTest.defects ?? [];
-                    for (const defect of defects) {
-                        if (amountOfEmbedFields >= 25) {
-                            currentTestEmbed.push(motTestEmbed);
-                            motTestEmbed = new EmbedBuilder()
-                                .setTitle(`${capitalize(motTest.testResult)} | MOT Test ${motTestIndex + 1} / ${motData.motTests.length} (Continued)`)
-                                .setColor(embedColor) // we should never get a random color.... but just in case (The docs for the MOT API are not very good)
-                                .setFooter({
-                                    "text": `MOT Test Number: ${motTest.motTestNumber ?? "Unknown"}`,
-                                });
-                            amountOfEmbedFields = 0;
-                        }
+                        for (const defect of defects) {
+                            const defectType = defect?.type ? capitalize(defect.type) : "Defect";
+                            const defectText = defect?.text ?? "No details provided";
+                            const field = { "name": defectType, "value": defectText };
 
-                        const defectType = defect?.type ? capitalize(defect.type) : "Defect";
-                        const defectText = defect?.text ?? "No details provided";
-                        motTestEmbed.addFields({ "name": defectType, "value": defectText });
-                        amountOfEmbedFields++;
-                    }
+                            if (amountOfEmbedFields >= 25) {
+                                currentTestEmbed.push(motTestEmbed);
+                                motTestEmbed = makeMotTestEmbed(" (Continued)");
+                                amountOfEmbedFields = 0;
+                            }
+
+                            const resizedEmbed = ensureEmbedSize(
+                                motTestEmbed,
+                                field,
+                                () => {
+                                    currentTestEmbed.push(motTestEmbed);
+                                    amountOfEmbedFields = 0;
+                                    return makeMotTestEmbed(" (Continued)");
+                                }
+                            );
+                            motTestEmbed = resizedEmbed;
+
+                            motTestEmbed.addFields(field);
+                            amountOfEmbedFields++;
+                        }
 
                     currentTestEmbed.push(motTestEmbed);
                     motTestEmbeds.push(...currentTestEmbed);
