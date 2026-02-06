@@ -1,9 +1,7 @@
 require("dotenv").config();
 const lcl = require("cli-color");
 const path = require("path");
-const {
-    REST
-} = require('@discordjs/rest');
+const { REST } = require('@discordjs/rest');
 const {
     Client,
     GatewayIntentBits,
@@ -12,11 +10,7 @@ const {
     ActivityType,
     EmbedBuilder
 } = require("discord.js");
-const {
-    existsSync,
-    mkdirSync,
-    readdirSync
-} = require('fs');
+const { existsSync, mkdirSync, readdirSync } = require('fs');
 
 const client = new Client({
     disableEveryone: true,
@@ -33,14 +27,14 @@ try {
     // get base for commands
     const commands = [];
     const personalCommands = [];
-    const commandFiles = readdirSync(path.join(__dirname, 'commands')).filter(file => file.endsWith('.js'));
+    const commandFiles = readdirSync(path.join(__dirname, 'commands')).filter((file) => file.endsWith('.js'));
     client.commands = new Collection();
 
     for (const file of commandFiles) {
         try {
             const command = require(path.join(__dirname, 'commands', file));
             // if we are in production (not NODE_ENV=development), skip dev commands (commands that are not .public.js or .personal.js)
-            if (process.env.NODE_ENV != "development" && !file.endsWith(".public.js") && !file.endsWith(".personal.js")) continue;
+            if (process.env.NODE_ENV !== "development" && !file.endsWith(".public.js") && !file.endsWith(".personal.js")) continue;
             if (file.endsWith(".personal.js")) {
                 personalCommands.push(command.data.toJSON());
             } else {
@@ -67,13 +61,13 @@ try {
         const clientId = client.user.id;
 
         // attempt to clear commands
-        if (process.env.NO_REFRESH != "true") {
+        if (process.env.NO_REFRESH !== "true") {
             try {
                 console.log(lcl.blue("[Discord - Info]"), `Clearing application (/) commands.`);
-                if (process.env.SERVER != undefined && process.env.SERVER != "") {
+                if (process.env.SERVER !== undefined && process.env.SERVER !== "") {
                     try {
                         console.log(lcl.blue("[Discord - Info]"), "Clearing server ID: " + process.env.SERVER);
-                        var data = await rest.put(
+                        await rest.put(
                             Routes.applicationGuildCommands(clientId, process.env.SERVER), {
                             body: []
                         });
@@ -84,17 +78,17 @@ try {
                 if (process.env.P_SERVER) {
                     if (personalCommands.length > 0) {
                         console.log(lcl.blue("[Discord - Info]"), `Started refreshing ${lcl.yellow(personalCommands.length)} application (/) ${personalCommands.length > 1 ? "commands" : "command"} for personal use.`);
-                        var data = await rest.put(
+                        await rest.put(
                             Routes.applicationGuildCommands(clientId, process.env.P_SERVER), {
                             body: [...personalCommands, ...commands] // merge personal and public commands
                         });
                     }
-                    var data = await rest.put(
+                    await rest.put(
                         Routes.applicationCommands(clientId), {
                         body: commands
                     });
                 }
-                var data = await rest.put(
+                await rest.put(
                     Routes.applicationCommands(clientId), {
                     body: []
                 });
@@ -107,19 +101,20 @@ try {
         // attempt to register commands
         try {
             console.log(lcl.blue("[Discord - Info]"), `Started refreshing ${lcl.yellow(commands.length)} application (/) ${commands.length > 1 ? "commands" : "command"}.`);
-            if (process.env.NODE_ENV == "development" && (process.env.SERVER != undefined && process.env.SERVER != "")) {
+            if (process.env.NODE_ENV === "development" && (process.env.SERVER !== undefined && process.env.SERVER !== "")) {
                 console.log(lcl.blue("[Discord - Info (Dev)]"), "Using server ID: " + process.env.SERVER);
-                var data = await rest.put(
+                const data = await rest.put(
                     Routes.applicationGuildCommands(clientId, process.env.SERVER), {
                     body: commands
                 });
+                console.log(lcl.green("[Discord - Success]"), `Successfully reloaded ${lcl.yellow(data.length)} application (/) ${commands.length > 1 ? "commands" : "command"}.`);
             } else {
-                var data = await rest.put(
+                const data = await rest.put(
                     Routes.applicationCommands(clientId), {
                     body: commands
                 });
+                console.log(lcl.green("[Discord - Success]"), `Successfully reloaded ${lcl.yellow(data.length)} application (/) ${commands.length > 1 ? "commands" : "command"}.`);
             }
-            console.log(lcl.green("[Discord - Success]"), `Successfully reloaded ${lcl.yellow(data.length)} application (/) ${commands.length > 1 ? "commands" : "command"}.`);
         } catch (err) {
             throw new Error("Failed to register application (/) commands.");
         }
@@ -132,7 +127,7 @@ try {
         console.log(lcl.blue("[Discord - Info]"), `Logged in as "${lcl.yellow(client.user.tag)}"!`);
     });
 
-    client.on('interactionCreate', async interaction => {
+    client.on('interactionCreate', async (interaction) => {
         // try find command
         try {
             // if bot is not online send loading embed
@@ -174,12 +169,18 @@ try {
 
             let interactionErrorEmbed = new EmbedBuilder()
                 .setTitle('Error - Failed to execute command')
-                .setDescription(`${process.env.NODE_ENV == "development" ? `${err['message']}\n\n` : ""}Failed to execute command: "${interaction.commandName}"`)
+                .setDescription(`${process.env.NODE_ENV === "development" ? `${err['message']}\n\n` : ""}Failed to execute command: "${interaction.commandName}"`)
                 .setColor('#FF6961');
-            await interaction.reply({
-                embeds: [interactionErrorEmbed],
-                ephemeral: true
-            });
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({
+                    embeds: [interactionErrorEmbed]
+                });
+            } else {
+                await interaction.reply({
+                    embeds: [interactionErrorEmbed],
+                    ephemeral: true
+                });
+            }
         }
     })
 

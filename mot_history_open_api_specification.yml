@@ -1,0 +1,751 @@
+---
+openapi: 3.0.0
+info:
+  title: MOT history API
+
+  version: 1.0.0
+
+servers:
+  - url: https://history.mot.api.gov.uk
+    description: API URL
+
+security:
+  - bearerAuth: []
+    apiKey: []
+
+paths:
+  /v1/trade/vehicles/registration/{registration}:
+    get:
+      tags:
+        - mot-history-api
+      summary: Get MOT tests for a single vehicle by registration number
+      description: |-
+        ```
+        GET /v1/trade/vehicles/registration
+        ```
+      parameters:
+        - $ref: '#/components/parameters/RegistrationParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/VehicleByRegistrationResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /v1/trade/vehicles/vin/{vin}:
+    get:
+      tags:
+        - mot-history-api
+      summary: Get MOT Tests for a single vehicle by vehicle identification number
+      description: |-
+        ```
+        GET /v1/trade/vehicles/vin/
+        ```
+      parameters:
+        - $ref: '#/components/parameters/VinParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/VehicleByVinResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /v1/trade/vehicles/bulk-download:
+    get:
+      tags:
+        - mot-history-api
+      summary: Get MOT history in bulk
+      description: |-
+        ```
+        GET /v1/trade/vehicles/bulk-download
+        ```
+
+        Although this endpoint does not yet contain full details for heavy vehicles, some heavy vehicle data may be returned in the response.
+      responses:
+        '200':
+          $ref: '#/components/responses/BulkDownloadResponse'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /v1/trade/credentials:
+    put:
+      tags:
+        - mot-history-api
+      summary: Request a new client secret
+      description: |-
+        ```
+        PUT: /v1/trade/credentials
+        ```
+        Request a new client secret
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenewCredentialsRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/RenewCredentialsResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '412':
+          $ref: '#/components/responses/412PreconditionFailed'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+components:
+  responses:
+    VehicleByRegistrationResponse:
+      description: |-
+        - The registration matches either a vehicle with MOT tests or new registered vehicle and is provided in the response body
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/VehicleWithMotResponse'
+              - $ref: '#/components/schemas/NewRegVehicleResponse'
+
+    VehicleByVinResponse:
+      description: |-
+        - The vehicle identification number matches either a vehicle with MOT tests or new registered vehicle and is provided in the response body
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/VehicleWithMotResponse'
+              - $ref: '#/components/schemas/NewRegVehicleResponse'
+
+    BulkDownloadResponse:
+      description: |-
+        - The file details and URLs required to download MOT history data in bulk
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BulkDownloadResponse'
+
+    RenewCredentialsResponse:
+      description: |-
+        - The email address and API Key Value matches user found in the database and successfully returns new credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RenewCredentialsResponse'
+
+    400BadRequest:
+      description: |-
+        - The format of the request is incorrect
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    404NotFound:
+      description: |-
+        - The requested data is not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    412PreconditionFailed:
+      description: |-
+        - Could not complete request because a constraint was not met
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    500InternalServerError:
+      description: |-
+        - An unexpected error has occurred
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ErrorResponse:
+      type: object
+      description: |-
+        - Error codes and response messages, where an error is returned
+      properties:
+        errorCode:
+          description: |-
+            - Code identifying specific error type. For more details, see “Error codes” in the API documentation
+          type: string
+          example: MOTH-NP-01
+        errorMessage:
+          description: |-
+            - Additional details about the error
+          maxLength: 4096
+          type: string
+        requestId:
+          description: |-
+            - ID of request. Please provide this if raising a support request.
+          type: string
+          example: "123-123-1234657"
+
+    Registration:
+      type: string
+      description: |-
+        - Registration number of the vehicle, where it was used in the request
+      example: AA51AAA
+
+    Vin:
+      type: string
+      description: |-
+        - Vehicle Identification Number, where it was used in the request. Usually 17 alphanumeric characters.
+      example: 1N4G7TCF1A9895216
+
+    VehicleWithMotResponse:
+      type: object
+      description: |-
+        - Vehicle data for vehicles with at least one MOT or annual test
+      properties:
+        registration:
+          type: string
+          nullable: true
+          description: |-
+            - Registration number of the vehicle
+        make:
+          type: string
+          nullable: true
+          example: Ford
+        model:
+          type: string
+          nullable: true
+          example: Focus
+        firstUsedDate:
+          type: string
+          format: date
+          nullable: true
+          description: |-
+            - Date the vehicle is first used in Great Britain, Northern Ireland or abroad
+            - Format: YYYY-MM-DD
+        fuelType:
+          type: string
+          nullable: true
+          description: |-
+            - The type of fuel the vehicle uses
+          example: Petrol
+        primaryColour:
+          type: string
+          nullable: true
+          example: Silver
+        registrationDate:
+          type: string
+          format: date
+          nullable: true
+          description: |-
+            - Date the vehicle is first registered in Great Britain, Northern Ireland or abroad
+            - Format: YYYY-MM-DD
+        manufactureDate:
+          type: string
+          format: date
+          nullable: true
+          description: |-
+            - Date the vehicle was manufactured
+            - Format: YYYY-MM-DD
+        engineSize:
+          type: string
+          nullable: true
+          description: |-
+            - Engine cylinder capacity (cc) of the vehicle
+          example: 1598
+        hasOutstandingRecall:
+          type: string
+          nullable: false
+          enum:
+            - Yes
+            - No
+            - Unknown
+            - Unavailable
+          description: |-
+            - One of four values from the DVSA Recalls service:
+              - Yes (There is at least one recall which has not yet been fixed)
+              - No (There were one or more recalls which have all been fixed)
+              - Unknown (No known recalls have been found in the available data)
+              - Unavailable (We were unable to retrieve data from the Recalls service due to an error)
+        motTests:
+          type: array
+          nullable: false
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/DVSAMotTest"
+              - $ref: "#/components/schemas/DVANIMotTest"
+              - $ref: "#/components/schemas/CVSMotTest"
+      required:
+        - hasOutstandingRecall
+        - motTests
+
+    DVSAMotTest:
+      description: |-
+        - Test result information from DVSA (Driver and Vehicle Standards Agency, Great Britain)
+      type: object
+      properties:
+        registrationAtTimeOfTest:
+          type: string
+          nullable: true
+          description: |-
+            - Registration number of the vehicle at the time of the test
+          example: AA51AAA
+        completedDate:
+          type: string
+          format: date-time
+          nullable: false
+          description: |-
+            - Date-time the test was completed.
+            - ISO Standard Date Format
+          example: "2023-02-17T09:17:46.000Z"
+        testResult:
+          type: string
+          nullable: false
+          enum:
+            - PASSED
+            - FAILED
+          description: |-
+            - Result of the MOT test. Only Passed or Failed tests are included.
+          example: PASSED
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+          description: |-
+            - Date the MOT test will expire
+            - Format: YYYY-MM-DD
+        odometerValue:
+          type: string
+          nullable: true
+          description: |-
+            - Odometer reading, if read
+        odometerUnit:
+          type: string
+          nullable: true
+          enum:
+            - MI
+            - KM
+            - null
+          description: |-
+            - Whether the odometer was read in miles or kilometres
+          example: MI
+        odometerResultType:
+          type: string
+          nullable: false
+          enum:
+            - READ
+            - UNREADABLE
+            - NO_ODOMETER
+          description: |-
+            - Whether or not the odometer was read during the MOT test. NO_ODOMETER means that a value is not available
+        motTestNumber:
+          type: string
+          nullable: true
+          description: |-
+            - 12 digit MOT test number
+        dataSource:
+          type: string
+          nullable: false
+          enum:
+            - DVSA
+          description: |-
+            - Source of the MOT test data.  In this case, DVSA (Driver and Vehicle Standards Agency, Great Britain)
+        defects:
+          type: array
+          nullable: true
+          description: |-
+            - Defects found during the MOT test
+          items:
+            $ref: "#/components/schemas/Defect"
+      required:
+        - completedDate
+        - testResult
+        - odometerResultType
+        - dataSource
+
+    DVANIMotTest:
+      type: object
+      description: |-
+        - Test result data from DVA NI (Driver and Vehicle Agency, Northern Ireland)
+      properties:
+        registrationAtTimeOfTest:
+          type: string
+          nullable: true
+          description: |-
+            - Registration number of the vehicle at the time of the test
+          example: null
+        completedDate:
+          type: string
+          format: date-time
+          nullable: false
+          description: |-
+            - Date-time the test was completed
+            - ISO Standard Date Format
+          example: "2023-02-17T09:17:46.000Z"
+        testResult:
+          type: string
+          nullable: false
+          enum:
+            - PASSED
+            - FAILED
+          description: |-
+            - Result of the MOT test. Only Passed or Failed tests included.
+          example: PASSED
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+          description: |-
+            - Date the MOT test will expire
+            - Format: YYYY-MM-DD
+        odometerValue:
+          type: string
+          nullable: true
+          description: |-
+            - Odometer reading, if read
+        odometerUnit:
+          type: string
+          nullable: true
+          enum:
+            - MI
+            - KM
+            - null
+          description: |-
+            - Whether the odometer was read in miles or kilometres
+          example: KM
+        odometerResultType:
+          type: string
+          nullable: false
+          enum:
+            - READ
+            - NO_ODOMETER
+          description: |-
+            - Whether or not the odometer was read during the MOT test. Set to NO_ODOMETER if value is not available
+        motTestNumber:
+          nullable: true
+          type: string
+          description: |-
+            - Identifier for the test
+        dataSource:
+          description: |-
+            - Source of the MOT test data.  In this case, DVA NI (Driver and Vehicle Agency, Northern Ireland)
+          type: string
+          nullable: false
+          enum:
+            - DVA NI
+      required:
+        - completedDate
+        - testResult
+        - odometerResultType
+        - dataSource
+
+    CVSMotTest:
+      description: |-
+        - Test result information from CVS (Driver and Vehicle Standards Agency, Commercial Vehicle Service)
+      type: object
+      properties:
+        registrationAtTimeOfTest:
+          type: string
+          nullable: true
+          description: |-
+            - Registration number of the vehicle at the time of the test.
+          example: null
+        completedDate:
+          type: string
+          format: date-time
+          nullable: true
+          description: |-
+            - Date-time the test was completed
+            - ISO Standard Date Format
+          example: "2023-02-17T09:17:46.000Z"
+        testResult:
+          type: string
+          nullable: false
+          enum:
+            - PASSED
+            - FAILED
+          description: |-
+            - Result of the MOT test. Only Passed or Failed tests included.
+          example: PASSED
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+          description: |-
+            - Date the MOT test will expire
+            - Format: YYYY-MM-DD
+        odometerValue:
+          type: string
+          nullable: true
+          description: |-
+            - Odometer reading, if read
+        odometerUnit:
+          type: string
+          nullable: true
+          enum:
+            - MI
+            - KM
+            - null
+          description: |-
+            - Whether the odometer was read in miles or kilometres
+          example: KM
+        odometerResultType:
+          type: string
+          nullable: false
+          enum:
+            - READ
+            - NO_ODOMETER
+          description: |-
+            - Where the odometerResultType isn't available set to NO_ODOMETER
+        motTestNumber:
+          type: string
+          nullable: true
+          description: |-
+            - Test certificate number
+        location:
+          type: string
+          nullable: true
+          description: |-
+            - Name of the Authorised Test Facility (ATF) where the test was conducted
+        dataSource:
+          type: string
+          nullable: false
+          enum:
+            - CVS
+          description: |-
+            - Source of the MOT test data.  In this case, CVS (Driver and Vehicle Standards Agency, Commercial Vehicle Service)
+        defects:
+          description: |-
+            - Details of any defects found during the test.
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/Defect"
+      required:
+        - completedDate
+        - testResult
+        - odometerResultType
+        - dataSource
+
+    Defect:
+      type: object
+      description: |-
+        - Defects found during the MOT or annual test.
+      properties:
+        text:
+          type: string
+          nullable: true
+          description: |-
+            -  Description of the defect
+        type:
+          type: string
+          enum:
+            - ADVISORY
+            - DANGEROUS
+            - FAIL
+            - MAJOR
+            - MINOR
+            - NON SPECIFIC
+            - SYSTEM GENERATED
+            - USER ENTERED
+          nullable: true
+        dangerous:
+          type: boolean
+          nullable: true
+          description: |-
+            - Whether the defect is dangerous
+          example: true
+
+    NewRegVehicleResponse:
+      description: |-
+        - Vehicle data for newly registered vehicles
+      type: object
+      properties:
+        registration:
+          type: string
+          nullable: true
+          description: |-
+            - Registration number of the vehicle
+        make:
+          type: string
+          nullable: true
+          description: |-
+            - Name of the vehicle manufacturer
+          example: Ford
+        model:
+          type: string
+          nullable: true
+          description: |-
+            - Model of the vehicle
+          example: Focus
+        manufactureYear:
+          type: string
+          nullable: true
+          description: |-
+            - The year the vehicle was manufactured
+            - Format: YYYY
+          example: 2024
+        fuelType:
+          type: string
+          nullable: true
+          description: |-
+            - The type of fuel the vehicle uses
+          example: Petrol
+        primaryColour:
+          type: string
+          nullable: true
+          description: |-
+            - Primary paint colour of the vehicle
+          example: Silver
+        registrationDate:
+          type: string
+          format: date
+          nullable: true
+          description: |-
+            - Date the vehicle was first registered
+            - Format: YYYY-MM-DD
+        manufactureDate:
+          type: string
+          format: date
+          nullable: true
+          description: |-
+            - Date the vehicle was manufactured
+            - Format: YYYY-MM-DD
+        motTestDueDate:
+          type: string
+          format: date
+          nullable: true
+          description: |-
+            - Date the first MOT test is due
+            - Format: YYYY-MM-DD
+        hasOutstandingRecall:
+          type: string
+          nullable: false
+          enum:
+            - Yes
+            - No
+            - Unknown
+            - Unavailable
+          description: |-
+            - One of four values from the DVSA Recalls service:
+              - Yes (There is at least one recall which has not yet been fixed)
+              - No (There were one or more recalls which have all been fixed)
+              - Unknown (No known recalls have been found in the available data)
+              - Unavailable (We were unable to retrieve data from the Recalls service due to an error)
+      required:
+        - hasOutstandingRecall
+
+    BulkDownloadResponse:
+      description: |-
+        - File information from the bulk download service
+      type: object
+      properties:
+        bulk:
+          description: |-
+            - Details about the bulk file
+          type: array
+          nullable: false
+          items:
+            $ref: "#/components/schemas/FileResponse"
+        delta:
+          description: |-
+            - Details about the delta files
+          type: array
+          nullable: false
+          items:
+            $ref: "#/components/schemas/FileResponse"
+
+    FileResponse:
+      description: |-
+        - File information from the bulk download service
+      type: object
+      properties:
+        filename:
+          description: |-
+            - filename of the downloaded file
+          type: string
+          nullable: false
+        downloadUrl:
+          type: string
+          nullable: false
+          description: |-
+           - Presigned URL for the related file:
+            - URL valid for 5 mins from generation
+            - Expect a .gz file which contains at least one other .gz file
+        fileSize:
+          type: number
+          nullable: false
+          description: |-
+           - Size of the ZIP file in bytes
+        fileCreatedOn:
+          type: string
+          format: date
+          nullable: false
+          description: |-
+            - Date the file was created
+            - Format: YYYY-MM-DD
+
+    RenewCredentialsRequest:
+      type: object
+      description: |-
+        - Information required to request a new client secret.
+      properties:
+        awsApiKeyValue:
+          type: string
+          nullable: false
+          description: |-
+            - the api key that was issued when you registered
+          example:  "your-existing-aws-api-key-value"
+        email:
+          type: string
+          nullable: false
+          description: |-
+            - the email address of the primary contact of the account
+          example: "user.example@email.com"
+
+    RenewCredentialsResponse:
+      type: object
+      properties:
+        clientSecret:
+          type: string
+          nullable: false
+          example: 'your-new-client-secret-value'
+
+  parameters:
+    RegistrationParam:
+      name: registration
+      in: path
+      description: |-
+        - Vehicle Registration Number used as a reference for a vehicle
+      required: true
+      style: simple
+      explode: false
+      schema:
+        $ref: '#/components/schemas/Registration'
+
+    VinParam:
+      name: vin
+      in: path
+      description: |-
+        - Vehicle Identification Number used as a reference for a vehicle
+      required: true
+      style: simple
+      explode: false
+      schema:
+        $ref: '#/components/schemas/Vin'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
