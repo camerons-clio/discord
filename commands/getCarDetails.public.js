@@ -86,6 +86,49 @@ const ensureEmbedSize = (currentEmbed, newField, makeNewEmbed) => {
     return currentEmbed;
 };
 
+const truncateText = (value, maxLength) => {
+    if (!value) return value;
+    if (value.length <= maxLength) return value;
+    if (maxLength <= 3) return value.slice(0, maxLength);
+    return `${value.slice(0, maxLength - 3)}...`;
+};
+
+const sanitizeField = (field) => {
+    const name = truncateText(field.name ?? "Field", 256);
+    const value = truncateText(field.value ?? "No details provided", 1024);
+    return { ...field, name, value };
+};
+
+const addFieldSafe = (currentEmbed, field, makeNewEmbed, fieldCountRef, baseFieldCount = 0) => {
+    const sizeLimit = 5900; // safety buffer below 6000
+    const safeField = sanitizeField(field);
+    let targetEmbed = currentEmbed;
+
+    if (fieldCountRef.value >= 25) {
+        targetEmbed = makeNewEmbed();
+        fieldCountRef.value = baseFieldCount;
+    }
+
+    const projected = getEmbedSize(targetEmbed) + safeField.name.length + safeField.value.length;
+    if (projected > sizeLimit) {
+        targetEmbed = makeNewEmbed();
+        fieldCountRef.value = baseFieldCount;
+    }
+
+    // If still too big, truncate value to fit remaining space.
+    const remaining = sizeLimit - getEmbedSize(targetEmbed) - safeField.name.length;
+    if (remaining < 1) {
+        return targetEmbed;
+    }
+    if (safeField.value.length > remaining) {
+        safeField.value = truncateText(safeField.value, Math.min(remaining, 1024));
+    }
+
+    targetEmbed.addFields(safeField);
+    fieldCountRef.value++;
+    return targetEmbed;
+};
+
 const getMotAccessToken = async () => {
     if (motAccessToken && motAccessTokenExpiresAt > Date.now() + 60_000) {
         return motAccessToken;
@@ -338,49 +381,81 @@ const buildMotEmbeds = (motData, vesData, interaction) => {
                             "text": `MOT Test Number: ${motTest.motTestNumber ?? "Unknown"}`,
                         });
                     let motTestEmbed = makeMotTestEmbed();
+                    const fieldCountRef = { value: 1 };
                     if (motTest.expiryDate) {
                         const motExpiryDate = dateTime(new Date(motTest.expiryDate));
                         const currentDate = dateTime(new Date());
 
-                        let testStatus = "Expired";
-                        if (new Date(motExpiryDate['dateTime']) > new Date()) testStatus = "Expires";
+                            let testStatus = "Expired";
+                            if (new Date(motExpiryDate['dateTime']) > new Date()) testStatus = "Expires";
 
-                        motTestEmbed.addFields([{ "name": testStatus, "value": `${motExpiryDate['date']}${motExpiryDate['ordinal']} ${motExpiryDate['monthName']}${motExpiryDate['year'] !== currentDate['year'] ? ` ${motExpiryDate['year']}` : ''}`, "inline": true }]);
-                    } else {
-                        addFieldOrBlank(motTestEmbed);
-                    }
-                    if (motTest.odometerValue && motTest.odometerUnit) {
-                        motTestEmbed.addFields([{ "name": "Mileage at MOT", "value": `${motTest.odometerValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${motTest.odometerUnit}`, "inline": true }]);
-                    } else {
-                        addFieldOrBlank(motTestEmbed);
-                    }
+                            const expiryField = { "name": testStatus, "value": `${motExpiryDate['date']}${motExpiryDate['ordinal']} ${motExpiryDate['monthName']}${motExpiryDate['year'] !== currentDate['year'] ? ` ${motExpiryDate['year']}` : ''}`, "inline": true };
+                            motTestEmbed = addFieldSafe(
+                                motTestEmbed,
+                                expiryField,
+                                () => {
+                                    currentTestEmbed.push(motTestEmbed);
+                                    return makeMotTestEmbed(" (Continued)");
+                                },
+                                fieldCountRef,
+                                1
+                            );
+                        } else {
+                            motTestEmbed = addFieldSafe(
+                                motTestEmbed,
+                                blankField,
+                                () => {
+                                    currentTestEmbed.push(motTestEmbed);
+                                    return makeMotTestEmbed(" (Continued)");
+                                },
+                                fieldCountRef,
+                                1
+                            );
+                        }
+                        if (motTest.odometerValue && motTest.odometerUnit) {
+                            const mileageField = { "name": "Mileage at MOT", "value": `${motTest.odometerValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${motTest.odometerUnit}`, "inline": true };
+                            motTestEmbed = addFieldSafe(
+                                motTestEmbed,
+                                mileageField,
+                                () => {
+                                    currentTestEmbed.push(motTestEmbed);
+                                    return makeMotTestEmbed(" (Continued)");
+                                },
+                                fieldCountRef,
+                                1
+                            );
+                        } else {
+                            motTestEmbed = addFieldSafe(
+                                motTestEmbed,
+                                blankField,
+                                () => {
+                                    currentTestEmbed.push(motTestEmbed);
+                                    return makeMotTestEmbed(" (Continued)");
+                                },
+                                fieldCountRef,
+                                1
+                            );
+                        }
 
-                    let amountOfEmbedFields = 3;
-                    const defects = motTest.defects ?? [];
+                        const defects = motTest.defects ?? [];
                         for (const defect of defects) {
                             const defectType = defect?.type ? capitalize(defect.type) : "Defect";
                             const defectText = defect?.text ?? "No details provided";
                             const field = { "name": defectType, "value": defectText };
 
-                            if (amountOfEmbedFields >= 25) {
-                                currentTestEmbed.push(motTestEmbed);
-                                motTestEmbed = makeMotTestEmbed(" (Continued)");
-                                amountOfEmbedFields = 0;
-                            }
-
-                            const resizedEmbed = ensureEmbedSize(
+                            const nextEmbed = addFieldSafe(
                                 motTestEmbed,
                                 field,
                                 () => {
                                     currentTestEmbed.push(motTestEmbed);
-                                    amountOfEmbedFields = 0;
                                     return makeMotTestEmbed(" (Continued)");
-                                }
+                                },
+                                fieldCountRef,
+                                1
                             );
-                            motTestEmbed = resizedEmbed;
-
-                            motTestEmbed.addFields(field);
-                            amountOfEmbedFields++;
+                            if (nextEmbed !== motTestEmbed) {
+                                motTestEmbed = nextEmbed;
+                            }
                         }
 
                     currentTestEmbed.push(motTestEmbed);
