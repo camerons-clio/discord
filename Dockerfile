@@ -1,5 +1,5 @@
 # Setup Image
-FROM node:20.10.0-slim
+FROM node:24.13.0-slim
 ARG USER=default
 ARG UID=1001
 ARG GID=1001
